@@ -161,7 +161,7 @@ func _draw_height_map() -> void:
 
 func _draw_tile_layers() -> void:
 	# Color each quad face by its bottom-layer marching-squares index.
-	# Index 0 = all water (blue), index 15 = all land (green), transitions = orange/yellow.
+	# Index 0 = all water (blue), index 15 = all land (green), transitions = yellow.
 	var verts := PackedVector3Array()
 	var colors := PackedColorArray()
 	var normals := PackedVector3Array()
@@ -174,7 +174,6 @@ func _draw_tile_layers() -> void:
 		if layers.is_empty():
 			continue
 
-		# Use the bottom layer's mesh_index for coloring.
 		var mesh_index: int = layers[0]["mesh_index"]
 		var color: Color
 		if mesh_index == 0:
@@ -190,7 +189,6 @@ func _draw_tile_layers() -> void:
 		var p2 := grid.subdivided_points[quad[2]] + lift
 		var p3 := grid.subdivided_points[quad[3]] + lift
 
-		# Two triangles per quad.
 		verts.append(p0); verts.append(p1); verts.append(p2)
 		verts.append(p0); verts.append(p2); verts.append(p3)
 		for _i in range(6):
