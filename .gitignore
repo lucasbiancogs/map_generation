@@ -1,2 +1,5 @@
 # Godot 4 editor data
 .godot/
+
+# Claude Code config
+CLAUDE.md
