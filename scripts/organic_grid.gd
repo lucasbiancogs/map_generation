@@ -21,6 +21,8 @@ var unmergeable_triangle_indices: Array[int] = []
 var subdivided_points: Array[Vector3] = []
 var subdivided_is_outer_edge: Array[bool] = []
 var subdivided_quads: Array[PackedInt32Array] = []
+## Connectivity: point index -> array of connected point indices.
+var connectivity: Dictionary = {}
 
 
 func _ready() -> void:
@@ -28,6 +30,7 @@ func _ready() -> void:
 	construct_triangles()
 	merge_triangles_into_quads()
 	subdivide_grid()
+	build_connectivity()
 	_build_visualization()
 
 
@@ -346,6 +349,29 @@ func _subdivide_shape(vert_indices: PackedInt32Array, center_idx: int,
 			vert_indices[next_i],
 			mid_indices[next_i]
 		]))
+
+
+# ===========================================================================
+# Step 5 — Build connectivity info
+# ===========================================================================
+
+func build_connectivity() -> void:
+	connectivity.clear()
+
+	for quad in subdivided_quads:
+		for vi in range(4):
+			var pt: int = quad[vi]
+			var right: int = quad[(vi + 1) % 4]
+			var left: int = quad[(vi + 3) % 4]
+
+			if not connectivity.has(pt):
+				connectivity[pt] = [] as Array[int]
+
+			var neighbors: Array[int] = connectivity[pt]
+			if not neighbors.has(right):
+				neighbors.append(right)
+			if not neighbors.has(left):
+				neighbors.append(left)
 
 
 # ===========================================================================

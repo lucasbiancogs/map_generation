@@ -14,7 +14,7 @@
 - [x] **Step 4 — Subdivide into Final Quads**
   Quads subdivide into 4 smaller quads; remaining triangles into 3 smaller quads. Shared edge midpoints via dictionary.
 
-- [ ] **Step 5 — Build Connectivity Info**
+- [x] **Step 5 — Build Connectivity Info**
   For each point, record connected points (neighbors sharing a quad edge) and connected quads.
 
 - [ ] **Step 6 — Relaxation**
