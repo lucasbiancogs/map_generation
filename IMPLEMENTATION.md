@@ -20,14 +20,6 @@
 - [x] **Step 6 — Relaxation**
   Laplacian smoothing: interior points move to centroid of neighbors. Outer-edge points are pinned. Fixed iteration count.
 
-- [x] **Step 7 — Apply World Offset**
-  Translate all points by the patch's world-space center position.
-
-## Patch System
-
-- [ ] **Multi-patch grid** — Generate N×M patches and merge shared boundary points.
-- [ ] **Global relaxation** — Apply relaxation to the merged grid.
-
 ## Tile System
 
 - [ ] **Dual-grid tile mesh construction**
