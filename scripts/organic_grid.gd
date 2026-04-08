@@ -8,7 +8,7 @@ extends Node3D
 ## Seed for random triangle merging.
 @export var randomization_seed: int = 0
 ## Relaxation iterations (Laplacian smoothing passes).
-@export_range(0, 200) var relaxation_iterations: int = 3
+@export_range(0, 200) var relaxation_iterations: int = 10
 
 ## Generated grid points (position + outer edge flag).
 var points: Array[Vector3] = []
