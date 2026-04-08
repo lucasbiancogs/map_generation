@@ -7,6 +7,8 @@ extends Node3D
 @export_range(1, 10) var iterations_count: int = 4
 ## Seed for random triangle merging.
 @export var randomization_seed: int = 0
+## Relaxation iterations (Laplacian smoothing passes).
+@export_range(0, 200) var relaxation_iterations: int = 3
 
 ## Generated grid points (position + outer edge flag).
 var points: Array[Vector3] = []
@@ -31,6 +33,7 @@ func _ready() -> void:
 	merge_triangles_into_quads()
 	subdivide_grid()
 	build_connectivity()
+	apply_relaxation()
 	_build_visualization()
 
 
@@ -372,6 +375,27 @@ func build_connectivity() -> void:
 				neighbors.append(right)
 			if not neighbors.has(left):
 				neighbors.append(left)
+
+
+# ===========================================================================
+# Step 6 — Relaxation (Laplacian smoothing)
+# ===========================================================================
+
+func apply_relaxation() -> void:
+	for _iter in range(relaxation_iterations):
+		for pt_idx in range(subdivided_points.size()):
+			if subdivided_is_outer_edge[pt_idx]:
+				continue
+
+			if not connectivity.has(pt_idx):
+				continue
+
+			var neighbors: Array[int] = connectivity[pt_idx]
+			var avg := Vector3.ZERO
+			for n in neighbors:
+				avg += subdivided_points[n]
+			avg /= neighbors.size()
+			subdivided_points[pt_idx] = avg
 
 
 # ===========================================================================
