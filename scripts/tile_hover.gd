@@ -75,38 +75,15 @@ func _find_nearest_interior_point(pos: Vector3) -> int:
 
 func _build_tile_mesh(center_idx: int) -> void:
 	var center := _grid.subdivided_points[center_idx]
-	var corners: Array[Vector3] = []
-
-	# Midpoints between center and each connected neighbor.
-	if _grid.connectivity.has(center_idx):
-		var neighbors: Array[int] = _grid.connectivity[center_idx]
-		for n in neighbors:
-			corners.append((center + _grid.subdivided_points[n]) * 0.5)
-
-	# Centers of each quad touching this point.
-	if _grid.connected_quads.has(center_idx):
-		var quad_indices: Array[int] = _grid.connected_quads[center_idx]
-		for qi in quad_indices:
-			var quad: PackedInt32Array = _grid.subdivided_quads[qi]
-			var qc := (_grid.subdivided_points[quad[0]] + _grid.subdivided_points[quad[1]]
-				+ _grid.subdivided_points[quad[2]] + _grid.subdivided_points[quad[3]]) * 0.25
-			corners.append(qc)
+	var corners := _grid.get_tile_corners(center_idx)
 
 	if corners.size() < 3:
 		_hover_mesh.visible = false
 		return
 
-	# Sort corners by angle around center.
-	corners.sort_custom(func(a: Vector3, b: Vector3) -> bool:
-		var angle_a := atan2(a.z - center.z, a.x - center.x)
-		var angle_b := atan2(b.z - center.z, b.x - center.x)
-		return angle_a < angle_b
-	)
-
-	# Fan triangulation: center → corner[i] → corner[i+1].
 	var verts := PackedVector3Array()
 	var normals := PackedVector3Array()
-	var lift := Vector3.UP * 0.005  # Slight lift to avoid z-fighting.
+	var lift := Vector3.UP * 0.01
 
 	for i in range(corners.size()):
 		var next_i: int = (i + 1) % corners.size()

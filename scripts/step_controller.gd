@@ -10,20 +10,17 @@ var _next_button: Button
 var _reset_button: Button
 var _run_all_button: Button
 
-
 var grid: OrganicGrid
 
 
 func _ready() -> void:
 	grid = get_node(grid_path) as OrganicGrid
 	_build_ui()
-	# Grid runs all steps on its own _ready. Show final state.
 	_current_step = OrganicGrid.TOTAL_STEPS
 	_update_ui()
 
 
 func _build_ui() -> void:
-	# Anchor to top-left with some margin.
 	var panel := PanelContainer.new()
 	panel.anchor_right = 0.0
 	panel.anchor_bottom = 0.0
@@ -67,8 +64,42 @@ func _build_ui() -> void:
 
 	vbox.add_child(hbox2)
 
+	# Visibility toggles.
+	var sep := HSeparator.new()
+	vbox.add_child(sep)
+
+	var toggles_label := Label.new()
+	toggles_label.text = "Visibility"
+	toggles_label.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(toggles_label)
+
+	_add_toggle(vbox, "Grid Wireframe", grid.show_grid_wireframe, func(toggled: bool):
+		grid.show_grid_wireframe = toggled
+		grid.refresh_visualization()
+	)
+	_add_toggle(vbox, "Points", grid.show_points, func(toggled: bool):
+		grid.show_points = toggled
+		grid.refresh_visualization()
+	)
+	_add_toggle(vbox, "Tile Edges", grid.show_tile_edges, func(toggled: bool):
+		grid.show_tile_edges = toggled
+		grid.refresh_visualization()
+	)
+	_add_toggle(vbox, "Connectivity", grid.show_connectivity, func(toggled: bool):
+		grid.show_connectivity = toggled
+		grid.refresh_visualization()
+	)
+
 	panel.add_child(vbox)
 	add_child(panel)
+
+
+func _add_toggle(parent: Control, label: String, default_on: bool, callback: Callable) -> void:
+	var cb := CheckBox.new()
+	cb.text = label
+	cb.button_pressed = default_on
+	cb.toggled.connect(callback)
+	parent.add_child(cb)
 
 
 func _on_next() -> void:
@@ -82,7 +113,6 @@ func _on_next() -> void:
 func _on_prev() -> void:
 	if _current_step <= 0:
 		return
-	# Re-run from scratch up to the previous step.
 	_current_step -= 1
 	grid.reset()
 	for step in range(1, _current_step + 1):

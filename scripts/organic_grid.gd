@@ -28,6 +28,15 @@ var connectivity: Dictionary = {}
 ## Point-to-quad connectivity: point index -> array of quad indices.
 var connected_quads: Dictionary = {}
 
+## Visualization toggles.
+var show_grid_wireframe: bool = true
+var show_points: bool = true
+var show_tile_edges: bool = true
+var show_connectivity: bool = false
+
+## Tracks which step we're currently displaying.
+var current_step: int = 0
+
 const STEP_NAMES: PackedStringArray = [
 	"1: Generate Points",
 	"2: Construct Triangles",
@@ -35,8 +44,9 @@ const STEP_NAMES: PackedStringArray = [
 	"4: Subdivide",
 	"5: Build Connectivity",
 	"6: Laplacian Relaxation",
+	"7: Dual-Grid Tile Mesh",
 ]
-const TOTAL_STEPS: int = 6
+const TOTAL_STEPS: int = 7
 
 
 func _ready() -> void:
@@ -46,9 +56,41 @@ func _ready() -> void:
 func run_all() -> void:
 	for step in range(1, TOTAL_STEPS + 1):
 		_execute_step(step)
-	_clear_visualization()
-	_visualize_subdivided()
+	current_step = TOTAL_STEPS
+	refresh_visualization()
 	build_collider()
+
+
+## Rebuilds visualization for the current step, respecting toggle flags.
+func refresh_visualization() -> void:
+	_clear_visualization()
+	if current_step == 0:
+		return
+
+	match current_step:
+		1:
+			if show_points:
+				_visualize_points(points, is_outer_edge)
+		2:
+			if show_grid_wireframe:
+				_visualize_triangles()
+			if show_points:
+				_visualize_points(points, is_outer_edge)
+		3:
+			if show_grid_wireframe:
+				_visualize_quads_and_tris()
+			if show_points:
+				_visualize_points(points, is_outer_edge)
+		_:
+			# Steps 4+ use subdivided data.
+			if show_grid_wireframe:
+				_draw_grid_wireframe()
+			if show_points:
+				_visualize_points(subdivided_points, subdivided_is_outer_edge)
+			if show_connectivity and current_step >= 5:
+				_visualize_connectivity()
+			if show_tile_edges and current_step >= 7:
+				_visualize_tiles()
 
 
 ## Builds a StaticBody3D collider from the grid quads for raycasting.
@@ -82,6 +124,7 @@ func build_collider() -> void:
 
 
 func reset() -> void:
+	current_step = 0
 	points.clear()
 	is_outer_edge.clear()
 	triangles.clear()
@@ -97,8 +140,10 @@ func reset() -> void:
 
 func run_step(step: int) -> void:
 	_execute_step(step)
-	_clear_visualization()
-	_visualize_step(step)
+	current_step = step
+	refresh_visualization()
+	if step >= 5:
+		build_collider()
 
 
 func _execute_step(step: int) -> void:
@@ -109,25 +154,7 @@ func _execute_step(step: int) -> void:
 		4: subdivide_grid()
 		5: build_connectivity()
 		6: apply_relaxation()
-
-
-func _visualize_step(step: int) -> void:
-	match step:
-		1:
-			_visualize_points(points, is_outer_edge)
-		2:
-			_visualize_triangles()
-			_visualize_points(points, is_outer_edge)
-		3:
-			_visualize_quads_and_tris()
-			_visualize_points(points, is_outer_edge)
-		4:
-			_visualize_subdivided()
-		5:
-			_visualize_subdivided()
-			_visualize_connectivity()
-		6:
-			_visualize_subdivided()
+		7: pass  # Tile mesh is visualization-only, no data step needed.
 
 
 # ===========================================================================
@@ -501,6 +528,72 @@ func apply_relaxation() -> void:
 
 
 # ===========================================================================
+# Tile mesh construction (dual-grid)
+# ===========================================================================
+
+## Returns sorted corner points for a tile centered on the given point index.
+## Corners are midpoints to neighbors + centers of touching quads, sorted by angle.
+func get_tile_corners(center_idx: int) -> Array[Vector3]:
+	var center := subdivided_points[center_idx]
+	var corners: Array[Vector3] = []
+
+	# Midpoints between center and each connected neighbor.
+	if connectivity.has(center_idx):
+		var neighbors: Array[int] = connectivity[center_idx]
+		for n in neighbors:
+			corners.append((center + subdivided_points[n]) * 0.5)
+
+	# Centers of each quad touching this point.
+	if connected_quads.has(center_idx):
+		var quad_indices: Array[int] = connected_quads[center_idx]
+		for qi in quad_indices:
+			var quad: PackedInt32Array = subdivided_quads[qi]
+			var qc := (subdivided_points[quad[0]] + subdivided_points[quad[1]]
+				+ subdivided_points[quad[2]] + subdivided_points[quad[3]]) * 0.25
+			corners.append(qc)
+
+	# Sort by angle around center.
+	corners.sort_custom(func(a: Vector3, b: Vector3) -> bool:
+		return atan2(a.z - center.z, a.x - center.x) < atan2(b.z - center.z, b.x - center.x)
+	)
+	return corners
+
+
+## Builds a wireframe of all interior tile edges.
+func build_tile_meshes() -> MeshInstance3D:
+	var lines := PackedVector3Array()
+	var lift := Vector3.UP * 0.005
+
+	for idx in range(subdivided_points.size()):
+		if subdivided_is_outer_edge[idx]:
+			continue
+
+		var corners := get_tile_corners(idx)
+		if corners.size() < 3:
+			continue
+
+		for i in range(corners.size()):
+			var next_i: int = (i + 1) % corners.size()
+			lines.append(corners[i] + lift)
+			lines.append(corners[next_i] + lift)
+
+	var arr_mesh := ArrayMesh.new()
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = lines
+	arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
+
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.9, 0.4, 0.4)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	arr_mesh.surface_set_material(0, mat)
+
+	var mesh_inst := MeshInstance3D.new()
+	mesh_inst.mesh = arr_mesh
+	return mesh_inst
+
+
+# ===========================================================================
 # Visualization — draw grid as wireframe + point markers
 # ===========================================================================
 
@@ -558,7 +651,7 @@ func _visualize_quads_and_tris() -> void:
 
 
 ## Step 4+ visualization: subdivided quads.
-func _visualize_subdivided() -> void:
+func _draw_grid_wireframe() -> void:
 	var lines := PackedVector3Array()
 	for quad in subdivided_quads:
 		var p0 := subdivided_points[quad[0]]; var p1 := subdivided_points[quad[1]]
@@ -568,7 +661,11 @@ func _visualize_subdivided() -> void:
 		lines.append(p2); lines.append(p3)
 		lines.append(p3); lines.append(p0)
 	_add_line_mesh(lines, Color(0.2, 0.9, 0.3))
-	_visualize_points(subdivided_points, subdivided_is_outer_edge)
+
+
+func _visualize_tiles() -> void:
+	var tile_mesh := build_tile_meshes()
+	add_child(tile_mesh)
 
 
 ## Draws a line from each point to all its connected neighbors.
