@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3 uid="uid://bep2n5mln624u"]
+[gd_scene load_steps=6 format=3 uid="uid://bep2n5mln624u"]
 
 [ext_resource type="Script" uid="uid://bwa7743dqiob1" path="res://scripts/organic_grid.gd" id="1_o5qli"]
 [ext_resource type="Script" uid="uid://kyknpmdof72h" path="res://scripts/step_controller.gd" id="2_step_ctrl"]
 [ext_resource type="Script" uid="uid://bvxda7p4j5qsv" path="res://scripts/camera_controller.gd" id="3_camera"]
-[ext_resource type="Script" path="res://scripts/tile_hover.gd" id="4_tile_hover"]
+[ext_resource type="Script" uid="uid://cvxviq117ve3p" path="res://scripts/tile_hover.gd" id="4_tile_hover"]
+[ext_resource type="Script" uid="uid://dgk776q3lhcem" path="res://scripts/organic_grid_visualizer.gd" id="5_visualizer"]
 
 [node name="Main" type="Node3D"]
 
@@ -18,6 +19,10 @@ transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 10, 0)
 [node name="OrganicGrid" type="Node3D" parent="."]
 script = ExtResource("1_o5qli")
 
+[node name="GridVisualizer" type="Node3D" parent="." node_paths=PackedStringArray("grid")]
+script = ExtResource("5_visualizer")
+grid = NodePath("../OrganicGrid")
+
 [node name="StepController" type="Control" parent="."]
 layout_mode = 3
 anchors_preset = 15
@@ -28,6 +33,7 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("2_step_ctrl")
 grid_path = NodePath("../OrganicGrid")
+visualizer_path = NodePath("../GridVisualizer")
 
 [node name="TileHover" type="Node3D" parent="."]
 script = ExtResource("4_tile_hover")

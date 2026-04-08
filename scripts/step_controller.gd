@@ -2,6 +2,7 @@ class_name StepController
 extends Control
 
 @export var grid_path: NodePath
+@export var visualizer_path: NodePath
 
 var _current_step: int = 0
 var _step_label: Label
@@ -11,12 +12,15 @@ var _reset_button: Button
 var _run_all_button: Button
 
 var grid: OrganicGrid
+var visualizer: OrganicGridVisualizer
 
 
 func _ready() -> void:
 	grid = get_node(grid_path) as OrganicGrid
+	visualizer = get_node(visualizer_path) as OrganicGridVisualizer
 	_build_ui()
 	_current_step = OrganicGrid.TOTAL_STEPS
+	visualizer.refresh()
 	_update_ui()
 
 
@@ -73,21 +77,21 @@ func _build_ui() -> void:
 	toggles_label.add_theme_font_size_override("font_size", 16)
 	vbox.add_child(toggles_label)
 
-	_add_toggle(vbox, "Grid Wireframe", grid.show_grid_wireframe, func(toggled: bool):
-		grid.show_grid_wireframe = toggled
-		grid.refresh_visualization()
+	_add_toggle(vbox, "Grid Wireframe", visualizer.show_grid_wireframe, func(toggled: bool):
+		visualizer.show_grid_wireframe = toggled
+		visualizer.refresh()
 	)
-	_add_toggle(vbox, "Points", grid.show_points, func(toggled: bool):
-		grid.show_points = toggled
-		grid.refresh_visualization()
+	_add_toggle(vbox, "Points", visualizer.show_points, func(toggled: bool):
+		visualizer.show_points = toggled
+		visualizer.refresh()
 	)
-	_add_toggle(vbox, "Tile Edges", grid.show_tile_edges, func(toggled: bool):
-		grid.show_tile_edges = toggled
-		grid.refresh_visualization()
+	_add_toggle(vbox, "Tile Edges", visualizer.show_tile_edges, func(toggled: bool):
+		visualizer.show_tile_edges = toggled
+		visualizer.refresh()
 	)
-	_add_toggle(vbox, "Connectivity", grid.show_connectivity, func(toggled: bool):
-		grid.show_connectivity = toggled
-		grid.refresh_visualization()
+	_add_toggle(vbox, "Connectivity", visualizer.show_connectivity, func(toggled: bool):
+		visualizer.show_connectivity = toggled
+		visualizer.refresh()
 	)
 
 	panel.add_child(vbox)
@@ -107,6 +111,7 @@ func _on_next() -> void:
 		return
 	_current_step += 1
 	grid.run_step(_current_step)
+	visualizer.refresh()
 	_update_ui()
 
 
@@ -117,14 +122,14 @@ func _on_prev() -> void:
 	grid.reset()
 	for step in range(1, _current_step + 1):
 		grid.run_step(step)
-	if _current_step == 0:
-		grid._clear_visualization()
+	visualizer.refresh()
 	_update_ui()
 
 
 func _on_reset() -> void:
 	_current_step = 0
 	grid.reset()
+	visualizer.refresh()
 	_update_ui()
 
 
@@ -132,6 +137,7 @@ func _on_run_all() -> void:
 	grid.reset()
 	grid.run_all()
 	_current_step = OrganicGrid.TOTAL_STEPS
+	visualizer.refresh()
 	_update_ui()
 
 

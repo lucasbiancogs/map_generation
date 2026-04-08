@@ -22,7 +22,7 @@
 
 ## Tile System
 
-- [ ] **Dual-grid tile mesh construction**
+- [x] **Dual-grid tile mesh construction**
 - [ ] **Tile types (land/water)**
 - [ ] **Tile placement rules**
 - [ ] **Lattice deformation for 3D tile meshes**

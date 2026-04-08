@@ -28,12 +28,6 @@ var connectivity: Dictionary = {}
 ## Point-to-quad connectivity: point index -> array of quad indices.
 var connected_quads: Dictionary = {}
 
-## Visualization toggles.
-var show_grid_wireframe: bool = true
-var show_points: bool = true
-var show_tile_edges: bool = true
-var show_connectivity: bool = false
-
 ## Tracks which step we're currently displaying.
 var current_step: int = 0
 
@@ -57,40 +51,7 @@ func run_all() -> void:
 	for step in range(1, TOTAL_STEPS + 1):
 		_execute_step(step)
 	current_step = TOTAL_STEPS
-	refresh_visualization()
 	build_collider()
-
-
-## Rebuilds visualization for the current step, respecting toggle flags.
-func refresh_visualization() -> void:
-	_clear_visualization()
-	if current_step == 0:
-		return
-
-	match current_step:
-		1:
-			if show_points:
-				_visualize_points(points, is_outer_edge)
-		2:
-			if show_grid_wireframe:
-				_visualize_triangles()
-			if show_points:
-				_visualize_points(points, is_outer_edge)
-		3:
-			if show_grid_wireframe:
-				_visualize_quads_and_tris()
-			if show_points:
-				_visualize_points(points, is_outer_edge)
-		_:
-			# Steps 4+ use subdivided data.
-			if show_grid_wireframe:
-				_draw_grid_wireframe()
-			if show_points:
-				_visualize_points(subdivided_points, subdivided_is_outer_edge)
-			if show_connectivity and current_step >= 5:
-				_visualize_connectivity()
-			if show_tile_edges and current_step >= 7:
-				_visualize_tiles()
 
 
 ## Builds a StaticBody3D collider from the grid quads for raycasting.
@@ -135,13 +96,11 @@ func reset() -> void:
 	subdivided_quads.clear()
 	connectivity.clear()
 	connected_quads.clear()
-	_clear_visualization()
 
 
 func run_step(step: int) -> void:
 	_execute_step(step)
 	current_step = step
-	refresh_visualization()
 	if step >= 5:
 		build_collider()
 
@@ -557,175 +516,3 @@ func get_tile_corners(center_idx: int) -> Array[Vector3]:
 		return atan2(a.z - center.z, a.x - center.x) < atan2(b.z - center.z, b.x - center.x)
 	)
 	return corners
-
-
-## Builds a wireframe of all interior tile edges.
-func build_tile_meshes() -> MeshInstance3D:
-	var lines := PackedVector3Array()
-	var lift := Vector3.UP * 0.005
-
-	for idx in range(subdivided_points.size()):
-		if subdivided_is_outer_edge[idx]:
-			continue
-
-		var corners := get_tile_corners(idx)
-		if corners.size() < 3:
-			continue
-
-		for i in range(corners.size()):
-			var next_i: int = (i + 1) % corners.size()
-			lines.append(corners[i] + lift)
-			lines.append(corners[next_i] + lift)
-
-	var arr_mesh := ArrayMesh.new()
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = lines
-	arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
-
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.9, 0.4, 0.4)
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	arr_mesh.surface_set_material(0, mat)
-
-	var mesh_inst := MeshInstance3D.new()
-	mesh_inst.mesh = arr_mesh
-	return mesh_inst
-
-
-# ===========================================================================
-# Visualization — draw grid as wireframe + point markers
-# ===========================================================================
-
-func _clear_visualization() -> void:
-	for child in get_children():
-		child.queue_free()
-
-
-## Step 1 visualization: just points.
-func _visualize_points(pts: Array[Vector3], outer: Array[bool]) -> void:
-	var inner_pos := PackedVector3Array()
-	var outer_pos := PackedVector3Array()
-	for i in range(pts.size()):
-		if outer[i]:
-			outer_pos.append(pts[i])
-		else:
-			inner_pos.append(pts[i])
-	_create_point_cloud(inner_pos, Color(1.0, 1.0, 0.2), 0.04)
-	_create_point_cloud(outer_pos, Color(1.0, 0.3, 0.2), 0.06)
-
-
-## Step 2 visualization: triangle wireframe.
-func _visualize_triangles() -> void:
-	var lines := PackedVector3Array()
-	var tri_count: int = triangles.size() / 3
-	for t in range(tri_count):
-		var i0: int = triangles[t * 3]
-		var i1: int = triangles[t * 3 + 1]
-		var i2: int = triangles[t * 3 + 2]
-		lines.append(points[i0]); lines.append(points[i1])
-		lines.append(points[i1]); lines.append(points[i2])
-		lines.append(points[i2]); lines.append(points[i0])
-	_add_line_mesh(lines, Color(0.3, 0.7, 1.0))
-
-
-## Step 3 visualization: quads (green) + unmergeable triangles (orange).
-func _visualize_quads_and_tris() -> void:
-	var quad_lines := PackedVector3Array()
-	for quad in quads:
-		var p0 := points[quad[0]]; var p1 := points[quad[1]]
-		var p2 := points[quad[2]]; var p3 := points[quad[3]]
-		quad_lines.append(p0); quad_lines.append(p1)
-		quad_lines.append(p1); quad_lines.append(p2)
-		quad_lines.append(p2); quad_lines.append(p3)
-		quad_lines.append(p3); quad_lines.append(p0)
-	_add_line_mesh(quad_lines, Color(0.2, 0.9, 0.3))
-
-	var tri_lines := PackedVector3Array()
-	for tri_idx in unmergeable_triangle_indices:
-		var v := _get_tri_vertices(tri_idx)
-		tri_lines.append(points[v[0]]); tri_lines.append(points[v[1]])
-		tri_lines.append(points[v[1]]); tri_lines.append(points[v[2]])
-		tri_lines.append(points[v[2]]); tri_lines.append(points[v[0]])
-	_add_line_mesh(tri_lines, Color(1.0, 0.5, 0.1))
-
-
-## Step 4+ visualization: subdivided quads.
-func _draw_grid_wireframe() -> void:
-	var lines := PackedVector3Array()
-	for quad in subdivided_quads:
-		var p0 := subdivided_points[quad[0]]; var p1 := subdivided_points[quad[1]]
-		var p2 := subdivided_points[quad[2]]; var p3 := subdivided_points[quad[3]]
-		lines.append(p0); lines.append(p1)
-		lines.append(p1); lines.append(p2)
-		lines.append(p2); lines.append(p3)
-		lines.append(p3); lines.append(p0)
-	_add_line_mesh(lines, Color(0.2, 0.9, 0.3))
-
-
-func _visualize_tiles() -> void:
-	var tile_mesh := build_tile_meshes()
-	add_child(tile_mesh)
-
-
-## Draws a line from each point to all its connected neighbors.
-func _visualize_connectivity() -> void:
-	var lines := PackedVector3Array()
-	for pt_idx in connectivity.keys():
-		var pos: Vector3 = subdivided_points[pt_idx]
-		var neighbors: Array[int] = connectivity[pt_idx]
-		for n in neighbors:
-			# Draw each connection as a line slightly raised to avoid z-fighting with the quad wireframe.
-			var n_pos: Vector3 = subdivided_points[n]
-			lines.append(pos + Vector3.UP * 0.01)
-			lines.append(n_pos + Vector3.UP * 0.01)
-	_add_line_mesh(lines, Color(1.0, 0.2, 0.6, 0.6))
-
-
-func _add_line_mesh(lines: PackedVector3Array, color: Color) -> void:
-	if lines.is_empty():
-		return
-
-	var arr_mesh := ArrayMesh.new()
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = lines
-	arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
-
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	arr_mesh.surface_set_material(0, mat)
-
-	var mesh_inst := MeshInstance3D.new()
-	mesh_inst.mesh = arr_mesh
-	add_child(mesh_inst)
-
-
-
-func _create_point_cloud(positions: PackedVector3Array, color: Color, radius: float) -> void:
-	if positions.is_empty():
-		return
-
-	var sphere := SphereMesh.new()
-	sphere.radius = radius
-	sphere.height = radius * 2.0
-	sphere.radial_segments = 8
-	sphere.rings = 4
-
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	sphere.material = mat
-
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.mesh = sphere
-	mm.instance_count = positions.size()
-
-	for i in range(positions.size()):
-		mm.set_instance_transform(i, Transform3D(Basis.IDENTITY, positions[i]))
-
-	var mm_inst := MultiMeshInstance3D.new()
-	mm_inst.multimesh = mm
-	add_child(mm_inst)
