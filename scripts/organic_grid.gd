@@ -4,7 +4,7 @@ extends Node3D
 ## Distance from center to hex vertex.
 @export_range(0.5, 20.0) var hex_size: float = 1.0
 ## Number of concentric rings per patch.
-@export_range(1, 10) var iterations_count: int = 4
+@export_range(1, 10) var iterations_count: int = 6
 ## Seed for random triangle merging.
 @export var randomization_seed: int = 0
 ## Relaxation iterations (Laplacian smoothing passes).
@@ -91,7 +91,12 @@ func _visualize_step(step: int) -> void:
 		3:
 			_visualize_quads_and_tris()
 			_visualize_points(points, is_outer_edge)
-		4, 5, 6, 7:
+		4:
+			_visualize_subdivided()
+		5:
+			_visualize_subdivided()
+			_visualize_connectivity()
+		6, 7:
 			_visualize_subdivided()
 
 
@@ -540,6 +545,20 @@ func _visualize_subdivided() -> void:
 		lines.append(p3); lines.append(p0)
 	_add_line_mesh(lines, Color(0.2, 0.9, 0.3))
 	_visualize_points(subdivided_points, subdivided_is_outer_edge)
+
+
+## Draws a line from each point to all its connected neighbors.
+func _visualize_connectivity() -> void:
+	var lines := PackedVector3Array()
+	for pt_idx in connectivity.keys():
+		var pos: Vector3 = subdivided_points[pt_idx]
+		var neighbors: Array[int] = connectivity[pt_idx]
+		for n in neighbors:
+			# Draw each connection as a line slightly raised to avoid z-fighting with the quad wireframe.
+			var n_pos: Vector3 = subdivided_points[n]
+			lines.append(pos + Vector3.UP * 0.01)
+			lines.append(n_pos + Vector3.UP * 0.01)
+	_add_line_mesh(lines, Color(1.0, 0.2, 0.6, 0.6))
 
 
 func _add_line_mesh(lines: PackedVector3Array, color: Color) -> void:
