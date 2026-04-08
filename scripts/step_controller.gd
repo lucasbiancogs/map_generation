@@ -20,6 +20,9 @@ func _ready() -> void:
 	visualizer = get_node(visualizer_path) as OrganicGridVisualizer
 	_build_ui()
 	_current_step = OrganicGrid.TOTAL_STEPS
+	# Wait for MapGeneration to finish (it awaits one frame after grid).
+	await get_tree().process_frame
+	await get_tree().process_frame
 	visualizer.refresh()
 	_update_ui()
 
@@ -91,6 +94,10 @@ func _build_ui() -> void:
 	)
 	_add_toggle(vbox, "Connectivity", visualizer.show_connectivity, func(toggled: bool):
 		visualizer.show_connectivity = toggled
+		visualizer.refresh()
+	)
+	_add_toggle(vbox, "Height Map", visualizer.show_height_map, func(toggled: bool):
+		visualizer.show_height_map = toggled
 		visualizer.refresh()
 	)
 

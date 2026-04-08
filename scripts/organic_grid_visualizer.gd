@@ -1,13 +1,16 @@
+## This class is designed only for debug pourposes.
 class_name OrganicGridVisualizer
 extends Node3D
 
 @export var grid: OrganicGrid
+@export var map_gen: MapGeneration
 
 ## Visualization toggles.
 var show_grid_wireframe: bool = true
 var show_points: bool = true
 var show_tile_edges: bool = true
 var show_connectivity: bool = false
+var show_height_map: bool = false
 
 ## Rebuilds visualization for the grid's current step, respecting toggle flags.
 func refresh() -> void:
@@ -39,6 +42,8 @@ func refresh() -> void:
 				_draw_connectivity()
 			if show_tile_edges and grid.current_step >= 7:
 				_draw_tile_edges()
+			if show_height_map and map_gen and not map_gen.height_map.is_empty():
+				_draw_height_map()
 
 
 func _clear() -> void:
@@ -123,6 +128,32 @@ func _draw_tile_edges() -> void:
 			lines.append(corners[next_i] + lift)
 
 	_add_line_mesh(lines, Color(0.9, 0.4, 0.4))
+
+
+func _draw_height_map() -> void:
+	# Group points by height and draw each group with a distinct color.
+	var max_h: int = 0
+	for h in map_gen.height_map:
+		if h > max_h:
+			max_h = h
+
+	var groups: Dictionary = {}  # height -> PackedVector3Array
+	for i in range(map_gen.height_map.size()):
+		var h: int = map_gen.height_map[i]
+		if not groups.has(h):
+			groups[h] = PackedVector3Array()
+		groups[h].append(grid.subdivided_points[i])
+
+	for h in groups.keys():
+		var color: Color
+		if h == 0:
+			color = Color(0.2, 0.4, 0.9)  # water = blue
+		elif max_h <= 1:
+			color = Color(0.3, 0.8, 0.3)  # land = green
+		else:
+			var t: float = float(h - 1) / float(maxi(max_h - 1, 1))
+			color = Color(0.3, 0.8, 0.3).lerp(Color(0.6, 0.4, 0.2), t)  # green -> brown
+		_create_point_cloud(groups[h], color, 0.04)
 
 
 func _draw_connectivity() -> void:

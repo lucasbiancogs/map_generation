@@ -25,8 +25,8 @@
 - [x] **Dual-grid tile mesh construction**
   Fan-triangulated tile shapes from midpoints + quad centers, sorted by angle. `get_tile_corners()` on OrganicGrid.
 
-- [ ] **Height map**
-  Store an integer height per interior grid point (0 = water, 1+ = land/cliff). Assign procedurally via noise or manually.
+- [x] **Height map**
+  Integer height per grid point (0 = water, 1+ = land/cliff). Outer edge forced to 0. Assigned via Perlin noise (`MapGeneration` class).
 
 - [ ] **Marching-squares mesh lookup**
   For each quad, read 4 corner heights. For each height transition layer, reduce to binary (above/below), compute 4-bit index (0–15), select from the 16 FBX mesh variants.
