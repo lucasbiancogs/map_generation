@@ -9,6 +9,8 @@ extends Node3D
 @export var randomization_seed: int = 0
 ## Relaxation iterations (Laplacian smoothing passes).
 @export_range(0, 200) var relaxation_iterations: int = 3
+## World-space offset applied to the patch (used for multi-patch positioning).
+@export var patch_offset: Vector3 = Vector3.ZERO
 
 ## Generated grid points (position + outer edge flag).
 var points: Array[Vector3] = []
@@ -32,9 +34,10 @@ const STEP_NAMES: PackedStringArray = [
 	"3: Merge into Quads",
 	"4: Subdivide",
 	"5: Build Connectivity",
-	"6: Relaxation",
+	"6: Laplacian Relaxation",
+	"7: Apply Offset",
 ]
-const TOTAL_STEPS: int = 6
+const TOTAL_STEPS: int = 7
 
 
 func _ready() -> void:
@@ -75,6 +78,7 @@ func _execute_step(step: int) -> void:
 		4: subdivide_grid()
 		5: build_connectivity()
 		6: apply_relaxation()
+		7: apply_offset()
 
 
 func _visualize_step(step: int) -> void:
@@ -87,7 +91,7 @@ func _visualize_step(step: int) -> void:
 		3:
 			_visualize_quads_and_tris()
 			_visualize_points(points, is_outer_edge)
-		4, 5, 6:
+		4, 5, 6, 7:
 			_visualize_subdivided()
 
 
@@ -450,6 +454,21 @@ func apply_relaxation() -> void:
 				avg += subdivided_points[n]
 			avg /= neighbors.size()
 			subdivided_points[pt_idx] = avg
+
+
+# ===========================================================================
+# Step 7 — Apply world offset
+# ===========================================================================
+
+func apply_offset() -> void:
+	if patch_offset == Vector3.ZERO:
+		return
+
+	for i in range(points.size()):
+		points[i] += patch_offset
+
+	for i in range(subdivided_points.size()):
+		subdivided_points[i] += patch_offset
 
 
 # ===========================================================================

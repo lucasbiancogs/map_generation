@@ -20,7 +20,7 @@
 - [x] **Step 6 — Relaxation**
   Laplacian smoothing: interior points move to centroid of neighbors. Outer-edge points are pinned. Fixed iteration count.
 
-- [ ] **Step 7 — Apply World Offset**
+- [x] **Step 7 — Apply World Offset**
   Translate all points by the patch's world-space center position.
 
 ## Patch System
