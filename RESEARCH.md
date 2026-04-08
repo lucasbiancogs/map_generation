@@ -228,11 +228,39 @@ For each grid point (tile center):
 4. Sort corner points by angle from center.
 5. Triangulate as a fan from center to sorted corners.
 
-### 5.3 Tile Types
+### 5.3 Tile Types — Height-Based Approach (Bad North style)
 
-Only two types: `WATER` (0) and `LAND` (1).
+Instead of the original binary water/land system, we use **integer heights** per grid point, inspired by Oskar Stalberg's approach in Bad North.
 
-The mesh selected for rendering depends on the 4 neighboring tile types (the quad's corner point types), giving the `Dual_Grid_[L/W]_[L/W]_[L/W]_[L/W]` naming scheme.
+#### Original approach (Unity project)
+- Two types: `WATER` (0) and `LAND` (1).
+- Mesh selected by the 4 corner types of each quad: `Dual_Grid_[L/W]_[L/W]_[L/W]_[L/W]`.
+- 2^4 = 16 mesh combinations, all provided as FBX files.
+
+#### New approach (height-based dual-grid)
+- Each grid point stores an **integer height** (0 = water, 1 = land, 2+ = cliff/mountain).
+- Visual tiles sit at the intersection of 4 grid points (dual-grid) and read their heights.
+- For each **height transition layer**, the 4 corners are reduced to binary (above/below that layer) giving a **marching-squares-style 4-bit index** (0–15).
+- The same 16 FBX meshes are reused for every layer — `L` = above the threshold, `W` = below.
+- **Multi-height cliffs** are achieved by stacking layers vertically. Each layer handles one height step using the same 16-mesh lookup.
+
+#### Why this works
+- Adding new terrain heights doesn't require new meshes — the same 16 transition meshes are reused per layer.
+- Cliffs emerge naturally where adjacent points differ in height.
+- Compatible with the existing FBX assets without modification.
+- Simpler than a generic socket system while supporting arbitrary terrain complexity.
+
+#### Mesh lookup per quad
+```
+For each quad with corner heights [h0, h1, h2, h3]:
+    min_height = min(h0, h1, h2, h3)
+    max_height = max(h0, h1, h2, h3)
+
+    for layer in min_height .. max_height - 1:
+        bits = [1 if h > layer else 0 for h in [h0, h1, h2, h3]]
+        mesh_index = bits[0] | (bits[1] << 1) | (bits[2] << 2) | (bits[3] << 3)
+        place mesh[mesh_index] at vertical_offset = layer
+```
 
 ### 5.4 Lattice Deformation
 
@@ -242,12 +270,11 @@ The mesh selected for rendering depends on the 4 neighboring tile types (the qua
 - 4 top points = same positions elevated by `TILE_LATTICE_DEFAULT_HEIGHT` (2.6).
 - The lattice modifier warps the FBX mesh vertices to fit between these control points.
 
-### 5.5 Placement Rules
+### 5.5 Placement
 
-- Only interior points (not on outer edge) can receive tiles.
-- First tile can be placed anywhere.
-- Subsequent tiles must be adjacent to already-placed tiles.
-- Max 3 tiles can be selected/previewed simultaneously.
+- Only interior points (not on outer edge) can receive heights.
+- Heights are assigned procedurally (noise-based) or via manual painting.
+- The mesh lookup and stacking happen automatically based on the height map.
 
 ---
 

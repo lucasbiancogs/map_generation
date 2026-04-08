@@ -23,13 +23,29 @@
 ## Tile System
 
 - [x] **Dual-grid tile mesh construction**
-- [ ] **Tile types (land/water)**
-- [ ] **Tile placement rules**
-- [ ] **Lattice deformation for 3D tile meshes**
+  Fan-triangulated tile shapes from midpoints + quad centers, sorted by angle. `get_tile_corners()` on OrganicGrid.
+
+- [ ] **Height map**
+  Store an integer height per interior grid point (0 = water, 1+ = land/cliff). Assign procedurally via noise or manually.
+
+- [ ] **Marching-squares mesh lookup**
+  For each quad, read 4 corner heights. For each height transition layer, reduce to binary (above/below), compute 4-bit index (0–15), select from the 16 FBX mesh variants.
+
+- [ ] **Layer stacking**
+  Multi-height cliffs: iterate from min to max height per quad, place one mesh per layer at the corresponding vertical offset.
+
+- [ ] **Import FBX tile assets**
+  Import the 16 `Dual_Grid_*.fbx` meshes + `Water.fbx` into the Godot project.
+
+- [ ] **Lattice deformation**
+  Deform tile meshes to match the organic grid shape using 8 control points (4 bottom at grid vertices, 4 top elevated by tile height).
 
 ## Visualization
 
 - [x] **Wireframe rendering** — Triangle edges as lines.
 - [x] **Point markers** — Color-coded spheres (yellow = interior, red = outer edge).
-- [ ] **Grid quad visualization** — Render final quads with edge shader.
-- [ ] **Tile rendering**
+- [x] **Tile edge wireframe** — Dual-grid tile outlines (light red).
+- [x] **Visibility toggles** — UI checkboxes for wireframe, points, tile edges, connectivity.
+- [x] **Tile hover preview** — Highlighted tile shape on mouse hover via raycasting.
+- [ ] **Height map visualization** — Color-coded points or tiles by height value.
+- [ ] **3D tile rendering** — Render stacked FBX meshes per quad based on height map.
