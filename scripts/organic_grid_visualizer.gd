@@ -11,6 +11,7 @@ var show_points: bool = true
 var show_tile_edges: bool = true
 var show_connectivity: bool = false
 var show_height_map: bool = false
+var show_tile_layers: bool = false
 
 ## Rebuilds visualization for the grid's current step, respecting toggle flags.
 func refresh() -> void:
@@ -44,6 +45,8 @@ func refresh() -> void:
 				_draw_tile_edges()
 			if show_height_map and map_gen and not map_gen.height_map.is_empty():
 				_draw_height_map()
+			if show_tile_layers and map_gen and not map_gen.quad_tile_layers.is_empty():
+				_draw_tile_layers()
 
 
 func _clear() -> void:
@@ -154,6 +157,67 @@ func _draw_height_map() -> void:
 			var t: float = float(h - 1) / float(maxi(max_h - 1, 1))
 			color = Color(0.3, 0.8, 0.3).lerp(Color(0.6, 0.4, 0.2), t)  # green -> brown
 		_create_point_cloud(groups[h], color, 0.04)
+
+
+func _draw_tile_layers() -> void:
+	# Color each quad face by its bottom-layer marching-squares index.
+	# Index 0 = all water (blue), index 15 = all land (green), transitions = orange/yellow.
+	var verts := PackedVector3Array()
+	var colors := PackedColorArray()
+	var normals := PackedVector3Array()
+	var lift := Vector3.UP * 0.003
+
+	for qi in range(grid.subdivided_quads.size()):
+		if qi >= map_gen.quad_tile_layers.size():
+			break
+		var layers: Array = map_gen.quad_tile_layers[qi]
+		if layers.is_empty():
+			continue
+
+		# Use the bottom layer's mesh_index for coloring.
+		var mesh_index: int = layers[0]["mesh_index"]
+		var color: Color
+		if mesh_index == 0:
+			color = Color(0.15, 0.3, 0.7, 0.7)   # all water
+		elif mesh_index == 15:
+			color = Color(0.3, 0.7, 0.2, 0.7)     # all land
+		else:
+			color = Color(0.9, 0.7, 0.2, 0.7)     # transition
+
+		var quad: PackedInt32Array = grid.subdivided_quads[qi]
+		var p0 := grid.subdivided_points[quad[0]] + lift
+		var p1 := grid.subdivided_points[quad[1]] + lift
+		var p2 := grid.subdivided_points[quad[2]] + lift
+		var p3 := grid.subdivided_points[quad[3]] + lift
+
+		# Two triangles per quad.
+		verts.append(p0); verts.append(p1); verts.append(p2)
+		verts.append(p0); verts.append(p2); verts.append(p3)
+		for _i in range(6):
+			colors.append(color)
+			normals.append(Vector3.UP)
+
+	if verts.is_empty():
+		return
+
+	var arr_mesh := ArrayMesh.new()
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	arr_mesh.surface_set_material(0, mat)
+
+	var mesh_inst := MeshInstance3D.new()
+	mesh_inst.mesh = arr_mesh
+	add_child(mesh_inst)
 
 
 func _draw_connectivity() -> void:

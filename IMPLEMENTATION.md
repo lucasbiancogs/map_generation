@@ -28,8 +28,8 @@
 - [x] **Height map**
   Integer height per grid point (0 = water, 1+ = land/cliff). Outer edge forced to 0. Assigned via Perlin noise (`MapGeneration` class).
 
-- [ ] **Marching-squares mesh lookup**
-  For each quad, read 4 corner heights. For each height transition layer, reduce to binary (above/below), compute 4-bit index (0–15), select from the 16 FBX mesh variants.
+- [x] **Marching-squares mesh lookup**
+  For each quad, read 4 corner heights. For each height transition layer, reduce to binary (above/below), compute 4-bit index (0–15). Stored in `quad_tile_layers` on MapGeneration.
 
 - [ ] **Layer stacking**
   Multi-height cliffs: iterate from min to max height per quad, place one mesh per layer at the corresponding vertical offset.
@@ -47,5 +47,5 @@
 - [x] **Tile edge wireframe** — Dual-grid tile outlines (light red).
 - [x] **Visibility toggles** — UI checkboxes for wireframe, points, tile edges, connectivity.
 - [x] **Tile hover preview** — Highlighted tile shape on mouse hover via raycasting.
-- [ ] **Height map visualization** — Color-coded points or tiles by height value.
+- [x] **Height map visualization** — Color-coded points or tiles by height value.
 - [ ] **3D tile rendering** — Render stacked FBX meshes per quad based on height map.
