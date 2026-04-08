@@ -17,12 +17,17 @@ var triangles: PackedInt32Array = PackedInt32Array()
 var quads: Array[PackedInt32Array] = []
 ## Triangles that couldn't be merged (indices into the triangles list).
 var unmergeable_triangle_indices: Array[int] = []
+## Subdivided grid (final output of the subdivision step).
+var subdivided_points: Array[Vector3] = []
+var subdivided_is_outer_edge: Array[bool] = []
+var subdivided_quads: Array[PackedInt32Array] = []
 
 
 func _ready() -> void:
 	generate_hex_grid_points()
 	construct_triangles()
 	merge_triangles_into_quads()
+	subdivide_grid()
 	_build_visualization()
 
 
@@ -259,46 +264,114 @@ func _remove_from_adjacency(tri_index: int, other_merged: int, adjacency: Dictio
 
 
 # ===========================================================================
+# Step 4 — Subdivide quads and remaining triangles into smaller quads
+# ===========================================================================
+
+func subdivide_grid() -> void:
+	# Start with a copy of the original points.
+	subdivided_points = points.duplicate()
+	subdivided_is_outer_edge = is_outer_edge.duplicate()
+	subdivided_quads.clear()
+
+	# Dictionary to prevent duplicate edge midpoints.
+	# Key: packed pair of point indices -> midpoint index.
+	var edge_midpoints: Dictionary = {}
+
+	# Subdivide each quad into 4 smaller quads.
+	for quad in quads:
+		var center := _quad_center(quad)
+		var center_idx: int = subdivided_points.size()
+		subdivided_points.append(center)
+		subdivided_is_outer_edge.append(false)
+
+		var vert_indices := PackedInt32Array([quad[0], quad[1], quad[2], quad[3]])
+		_subdivide_shape(vert_indices, center_idx, edge_midpoints)
+
+	# Subdivide each unmergeable triangle into 3 smaller quads.
+	for tri_idx in unmergeable_triangle_indices:
+		var v := _get_tri_vertices(tri_idx)
+		var p0 := subdivided_points[v[0]]
+		var p1 := subdivided_points[v[1]]
+		var p2 := subdivided_points[v[2]]
+
+		var center := (p0 + p1 + p2) / 3.0
+		var center_idx: int = subdivided_points.size()
+		subdivided_points.append(center)
+		subdivided_is_outer_edge.append(false)
+
+		_subdivide_shape(v, center_idx, edge_midpoints)
+
+
+func _quad_center(quad: PackedInt32Array) -> Vector3:
+	return (subdivided_points[quad[0]] + subdivided_points[quad[1]]
+		+ subdivided_points[quad[2]] + subdivided_points[quad[3]]) * 0.25
+
+
+## Subdivides a shape (3 or 4 vertices) around a center point into quads.
+## For each edge, creates a midpoint (or reuses an existing one), then forms
+## a quad: center, mid_i, vertex_(i+1), mid_(i+1).
+func _subdivide_shape(vert_indices: PackedInt32Array, center_idx: int,
+		edge_midpoints: Dictionary) -> void:
+	var count: int = vert_indices.size()
+	var mid_indices := PackedInt32Array()
+	mid_indices.resize(count)
+
+	# Create or reuse edge midpoints.
+	for i in range(count):
+		var idx_a: int = vert_indices[i]
+		var idx_b: int = vert_indices[(i + 1) % count]
+
+		# Canonical key: smaller index first.
+		var key_lo: int = mini(idx_a, idx_b)
+		var key_hi: int = maxi(idx_a, idx_b)
+		var key: int = (key_hi << 16) | key_lo
+
+		if edge_midpoints.has(key):
+			mid_indices[i] = edge_midpoints[key]
+		else:
+			var mid_pos := (subdivided_points[idx_a] + subdivided_points[idx_b]) * 0.5
+			var mid_outer: bool = subdivided_is_outer_edge[idx_a] and subdivided_is_outer_edge[idx_b]
+			var mid_idx: int = subdivided_points.size()
+			subdivided_points.append(mid_pos)
+			subdivided_is_outer_edge.append(mid_outer)
+			edge_midpoints[key] = mid_idx
+			mid_indices[i] = mid_idx
+
+	# Create one quad per edge: center, mid[i], vertex[i+1], mid[i+1].
+	for i in range(count):
+		var next_i: int = (i + 1) % count
+		subdivided_quads.append(PackedInt32Array([
+			center_idx,
+			mid_indices[i],
+			vert_indices[next_i],
+			mid_indices[next_i]
+		]))
+
+
+# ===========================================================================
 # Visualization — draw grid as wireframe + point markers
 # ===========================================================================
 
 func _build_visualization() -> void:
-	_build_quad_wireframe()
-	_build_unmergeable_tri_wireframe()
+	_build_subdivided_wireframe()
 	_build_point_markers()
 
 
-## Draws quad edges as lines (green).
-func _build_quad_wireframe() -> void:
+## Draws subdivided quad edges as lines.
+func _build_subdivided_wireframe() -> void:
 	var lines := PackedVector3Array()
 
-	for quad in quads:
-		var p0: Vector3 = points[quad[0]]
-		var p1: Vector3 = points[quad[1]]
-		var p2: Vector3 = points[quad[2]]
-		var p3: Vector3 = points[quad[3]]
+	for quad in subdivided_quads:
+		var p0: Vector3 = subdivided_points[quad[0]]
+		var p1: Vector3 = subdivided_points[quad[1]]
+		var p2: Vector3 = subdivided_points[quad[2]]
+		var p3: Vector3 = subdivided_points[quad[3]]
 		lines.append(p0); lines.append(p1)
 		lines.append(p1); lines.append(p2)
 		lines.append(p2); lines.append(p3)
 		lines.append(p3); lines.append(p0)
 
 	_add_line_mesh(lines, Color(0.2, 0.9, 0.3))
-
-
-## Draws unmergeable triangle edges as lines (orange).
-func _build_unmergeable_tri_wireframe() -> void:
-	var lines := PackedVector3Array()
-
-	for tri_idx in unmergeable_triangle_indices:
-		var v := _get_tri_vertices(tri_idx)
-		var p0: Vector3 = points[v[0]]
-		var p1: Vector3 = points[v[1]]
-		var p2: Vector3 = points[v[2]]
-		lines.append(p0); lines.append(p1)
-		lines.append(p1); lines.append(p2)
-		lines.append(p2); lines.append(p0)
-
-	_add_line_mesh(lines, Color(1.0, 0.5, 0.1))
 
 
 func _add_line_mesh(lines: PackedVector3Array, color: Color) -> void:
@@ -323,15 +396,14 @@ func _add_line_mesh(lines: PackedVector3Array, color: Color) -> void:
 
 ## Draws small spheres at each grid point. Outer-edge points are colored differently.
 func _build_point_markers() -> void:
-	# We use two MultiMeshInstance3D: one for interior, one for outer-edge.
 	var inner_positions: PackedVector3Array = PackedVector3Array()
 	var outer_positions: PackedVector3Array = PackedVector3Array()
 
-	for i in range(points.size()):
-		if is_outer_edge[i]:
-			outer_positions.append(points[i])
+	for i in range(subdivided_points.size()):
+		if subdivided_is_outer_edge[i]:
+			outer_positions.append(subdivided_points[i])
 		else:
-			inner_positions.append(points[i])
+			inner_positions.append(subdivided_points[i])
 
 	_create_point_cloud(inner_positions, Color(1.0, 1.0, 0.2), 0.04)
 	_create_point_cloud(outer_positions, Color(1.0, 0.3, 0.2), 0.06)

@@ -11,7 +11,7 @@
 - [x] **Step 3 — Merge Triangles into Quads**
   Randomly merge adjacent triangle pairs into quadrilaterals using a seed for reproducibility. Some triangles remain unmerged.
 
-- [ ] **Step 4 — Subdivide into Final Quads**
+- [x] **Step 4 — Subdivide into Final Quads**
   Quads subdivide into 4 smaller quads; remaining triangles into 3 smaller quads. Shared edge midpoints via dictionary.
 
 - [ ] **Step 5 — Build Connectivity Info**
