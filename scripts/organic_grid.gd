@@ -1,21 +1,28 @@
-class_name HexGrid
+class_name OrganicGrid
 extends Node3D
 
 ## Distance from center to hex vertex.
 @export_range(0.5, 20.0) var hex_size: float = 1.0
 ## Number of concentric rings per patch.
 @export_range(1, 10) var iterations_count: int = 4
+## Seed for random triangle merging.
+@export var randomization_seed: int = 0
 
 ## Generated grid points (position + outer edge flag).
 var points: Array[Vector3] = []
 var is_outer_edge: Array[bool] = []
 ## Triangle indices (each group of 3 ints = one triangle).
 var triangles: PackedInt32Array = PackedInt32Array()
+## Quad vertex indices (each group of 4 ints = one quad).
+var quads: Array[PackedInt32Array] = []
+## Triangles that couldn't be merged (indices into the triangles list).
+var unmergeable_triangle_indices: Array[int] = []
 
 
 func _ready() -> void:
 	generate_hex_grid_points()
 	construct_triangles()
+	merge_triangles_into_quads()
 	_build_visualization()
 
 
@@ -116,39 +123,196 @@ func construct_triangles() -> void:
 
 
 # ===========================================================================
+# Step 3 — Merge adjacent triangles into quads
+# ===========================================================================
+
+func merge_triangles_into_quads() -> void:
+	quads.clear()
+	unmergeable_triangle_indices.clear()
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = randomization_seed
+
+	var tri_count: int = triangles.size() / 3
+
+	# Build adjacency: two triangles are adjacent if they share exactly 2 vertices.
+	var adjacency: Dictionary = {}  # tri_index -> Array[int] of adjacent tri indices
+	for i in range(tri_count):
+		adjacency[i] = [] as Array[int]
+
+	for i in range(tri_count):
+		var iv := _get_tri_vertices(i)
+		for j in range(i + 1, tri_count):
+			var jv := _get_tri_vertices(j)
+			var shared: int = 0
+			for vi in iv:
+				for vj in jv:
+					if vi == vj:
+						shared += 1
+			if shared == 2:
+				adjacency[i].append(j)
+				adjacency[j].append(i)
+
+	# Track which triangles are still available for merging.
+	var mergeable: Dictionary = {}  # tri_index -> true
+	for i in range(tri_count):
+		mergeable[i] = true
+
+	# Random upper limit on merges for more varied results.
+	var max_merges: int = rng.randi_range(tri_count / 3, tri_count)
+
+	while not mergeable.is_empty():
+		if quads.size() >= max_merges:
+			for idx in mergeable.keys():
+				unmergeable_triangle_indices.append(idx)
+			break
+
+		# Pick a random mergeable triangle.
+		var keys: Array = mergeable.keys()
+		var tri_a: int = keys[rng.randi_range(0, keys.size() - 1)]
+
+		# Filter its adjacency list to only still-mergeable triangles.
+		var available_neighbors: Array[int] = []
+		for n in adjacency[tri_a]:
+			if mergeable.has(n):
+				available_neighbors.append(n)
+
+		if available_neighbors.is_empty():
+			mergeable.erase(tri_a)
+			unmergeable_triangle_indices.append(tri_a)
+			continue
+
+		var tri_b: int = available_neighbors[rng.randi_range(0, available_neighbors.size() - 1)]
+
+		# Merge into a quad.
+		quads.append(_merge_two_triangles(tri_a, tri_b))
+
+		# Remove both from mergeable set.
+		mergeable.erase(tri_a)
+		mergeable.erase(tri_b)
+
+		# Update adjacency: remove references to merged triangles.
+		# If a neighbor loses all its mergeable neighbors, it becomes unmergeable.
+		_remove_from_adjacency(tri_a, tri_b, adjacency, mergeable, unmergeable_triangle_indices)
+		_remove_from_adjacency(tri_b, tri_a, adjacency, mergeable, unmergeable_triangle_indices)
+
+
+## Returns the 3 vertex indices of the triangle at the given index.
+func _get_tri_vertices(tri_index: int) -> PackedInt32Array:
+	var base: int = tri_index * 3
+	return PackedInt32Array([triangles[base], triangles[base + 1], triangles[base + 2]])
+
+
+## Merges two triangles into a quad. The shared edge vertices go to positions 0 and 2,
+## and the unique vertices go to positions 1 and 3, forming a proper quad winding.
+func _merge_two_triangles(tri_a: int, tri_b: int) -> PackedInt32Array:
+	var va := _get_tri_vertices(tri_a)
+	var vb := _get_tri_vertices(tri_b)
+
+	var shared: Array[int] = []
+	var unique: Array[int] = []
+
+	# Collect all 6 vertex indices, identify shared vs unique.
+	for v in va:
+		var found := false
+		for u in vb:
+			if v == u:
+				found = true
+				break
+		if found:
+			shared.append(v)
+		else:
+			unique.append(v)
+
+	for v in vb:
+		var found := false
+		for u in va:
+			if v == u:
+				found = true
+				break
+		if not found:
+			unique.append(v)
+
+	# Quad winding: shared[0], unique[0], shared[1], unique[1]
+	return PackedInt32Array([shared[0], unique[0], shared[1], unique[1]])
+
+
+## Removes a merged triangle from the adjacency of its neighbors.
+## If a neighbor loses all mergeable neighbors, it becomes unmergeable.
+func _remove_from_adjacency(tri_index: int, other_merged: int, adjacency: Dictionary,
+		mergeable: Dictionary, unmergeable: Array[int]) -> void:
+	for neighbor in adjacency[tri_index]:
+		if neighbor == other_merged:
+			continue
+		var neighbor_adj: Array[int] = adjacency[neighbor]
+		neighbor_adj.erase(tri_index)
+
+		# Check if this neighbor still has any mergeable adjacent triangles.
+		var has_mergeable_neighbor := false
+		for n in neighbor_adj:
+			if mergeable.has(n):
+				has_mergeable_neighbor = true
+				break
+		if not has_mergeable_neighbor and mergeable.has(neighbor):
+			mergeable.erase(neighbor)
+			unmergeable.append(neighbor)
+
+
+# ===========================================================================
 # Visualization — draw grid as wireframe + point markers
 # ===========================================================================
 
 func _build_visualization() -> void:
-	_build_wireframe_mesh()
+	_build_quad_wireframe()
+	_build_unmergeable_tri_wireframe()
 	_build_point_markers()
 
 
-## Draws triangle edges as lines.
-func _build_wireframe_mesh() -> void:
+## Draws quad edges as lines (green).
+func _build_quad_wireframe() -> void:
 	var lines := PackedVector3Array()
 
-	var tri_count: int = triangles.size() / 3
-	for t in range(tri_count):
-		var i0: int = triangles[t * 3]
-		var i1: int = triangles[t * 3 + 1]
-		var i2: int = triangles[t * 3 + 2]
-		var p0: Vector3 = points[i0]
-		var p1: Vector3 = points[i1]
-		var p2: Vector3 = points[i2]
+	for quad in quads:
+		var p0: Vector3 = points[quad[0]]
+		var p1: Vector3 = points[quad[1]]
+		var p2: Vector3 = points[quad[2]]
+		var p3: Vector3 = points[quad[3]]
+		lines.append(p0); lines.append(p1)
+		lines.append(p1); lines.append(p2)
+		lines.append(p2); lines.append(p3)
+		lines.append(p3); lines.append(p0)
+
+	_add_line_mesh(lines, Color(0.2, 0.9, 0.3))
+
+
+## Draws unmergeable triangle edges as lines (orange).
+func _build_unmergeable_tri_wireframe() -> void:
+	var lines := PackedVector3Array()
+
+	for tri_idx in unmergeable_triangle_indices:
+		var v := _get_tri_vertices(tri_idx)
+		var p0: Vector3 = points[v[0]]
+		var p1: Vector3 = points[v[1]]
+		var p2: Vector3 = points[v[2]]
 		lines.append(p0); lines.append(p1)
 		lines.append(p1); lines.append(p2)
 		lines.append(p2); lines.append(p0)
+
+	_add_line_mesh(lines, Color(1.0, 0.5, 0.1))
+
+
+func _add_line_mesh(lines: PackedVector3Array, color: Color) -> void:
+	if lines.is_empty():
+		return
 
 	var arr_mesh := ArrayMesh.new()
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = lines
-
 	arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
 
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.3, 0.7, 1.0)
+	mat.albedo_color = color
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	arr_mesh.surface_set_material(0, mat)
 
