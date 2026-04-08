@@ -26,15 +26,69 @@ var subdivided_quads: Array[PackedInt32Array] = []
 ## Connectivity: point index -> array of connected point indices.
 var connectivity: Dictionary = {}
 
+const STEP_NAMES: PackedStringArray = [
+	"1: Generate Points",
+	"2: Construct Triangles",
+	"3: Merge into Quads",
+	"4: Subdivide",
+	"5: Build Connectivity",
+	"6: Relaxation",
+]
+const TOTAL_STEPS: int = 6
+
 
 func _ready() -> void:
-	generate_hex_grid_points()
-	construct_triangles()
-	merge_triangles_into_quads()
-	subdivide_grid()
-	build_connectivity()
-	apply_relaxation()
-	_build_visualization()
+	run_all()
+
+
+func run_all() -> void:
+	for step in range(1, TOTAL_STEPS + 1):
+		_execute_step(step)
+	_clear_visualization()
+	_visualize_subdivided()
+
+
+func reset() -> void:
+	points.clear()
+	is_outer_edge.clear()
+	triangles.clear()
+	quads.clear()
+	unmergeable_triangle_indices.clear()
+	subdivided_points.clear()
+	subdivided_is_outer_edge.clear()
+	subdivided_quads.clear()
+	connectivity.clear()
+	_clear_visualization()
+
+
+func run_step(step: int) -> void:
+	_execute_step(step)
+	_clear_visualization()
+	_visualize_step(step)
+
+
+func _execute_step(step: int) -> void:
+	match step:
+		1: generate_hex_grid_points()
+		2: construct_triangles()
+		3: merge_triangles_into_quads()
+		4: subdivide_grid()
+		5: build_connectivity()
+		6: apply_relaxation()
+
+
+func _visualize_step(step: int) -> void:
+	match step:
+		1:
+			_visualize_points(points, is_outer_edge)
+		2:
+			_visualize_triangles()
+			_visualize_points(points, is_outer_edge)
+		3:
+			_visualize_quads_and_tris()
+			_visualize_points(points, is_outer_edge)
+		4, 5, 6:
+			_visualize_subdivided()
 
 
 # ===========================================================================
@@ -402,26 +456,71 @@ func apply_relaxation() -> void:
 # Visualization — draw grid as wireframe + point markers
 # ===========================================================================
 
-func _build_visualization() -> void:
-	_build_subdivided_wireframe()
-	_build_point_markers()
+func _clear_visualization() -> void:
+	for child in get_children():
+		child.queue_free()
 
 
-## Draws subdivided quad edges as lines.
-func _build_subdivided_wireframe() -> void:
+## Step 1 visualization: just points.
+func _visualize_points(pts: Array[Vector3], outer: Array[bool]) -> void:
+	var inner_pos := PackedVector3Array()
+	var outer_pos := PackedVector3Array()
+	for i in range(pts.size()):
+		if outer[i]:
+			outer_pos.append(pts[i])
+		else:
+			inner_pos.append(pts[i])
+	_create_point_cloud(inner_pos, Color(1.0, 1.0, 0.2), 0.04)
+	_create_point_cloud(outer_pos, Color(1.0, 0.3, 0.2), 0.06)
+
+
+## Step 2 visualization: triangle wireframe.
+func _visualize_triangles() -> void:
 	var lines := PackedVector3Array()
+	var tri_count: int = triangles.size() / 3
+	for t in range(tri_count):
+		var i0: int = triangles[t * 3]
+		var i1: int = triangles[t * 3 + 1]
+		var i2: int = triangles[t * 3 + 2]
+		lines.append(points[i0]); lines.append(points[i1])
+		lines.append(points[i1]); lines.append(points[i2])
+		lines.append(points[i2]); lines.append(points[i0])
+	_add_line_mesh(lines, Color(0.3, 0.7, 1.0))
 
+
+## Step 3 visualization: quads (green) + unmergeable triangles (orange).
+func _visualize_quads_and_tris() -> void:
+	var quad_lines := PackedVector3Array()
+	for quad in quads:
+		var p0 := points[quad[0]]; var p1 := points[quad[1]]
+		var p2 := points[quad[2]]; var p3 := points[quad[3]]
+		quad_lines.append(p0); quad_lines.append(p1)
+		quad_lines.append(p1); quad_lines.append(p2)
+		quad_lines.append(p2); quad_lines.append(p3)
+		quad_lines.append(p3); quad_lines.append(p0)
+	_add_line_mesh(quad_lines, Color(0.2, 0.9, 0.3))
+
+	var tri_lines := PackedVector3Array()
+	for tri_idx in unmergeable_triangle_indices:
+		var v := _get_tri_vertices(tri_idx)
+		tri_lines.append(points[v[0]]); tri_lines.append(points[v[1]])
+		tri_lines.append(points[v[1]]); tri_lines.append(points[v[2]])
+		tri_lines.append(points[v[2]]); tri_lines.append(points[v[0]])
+	_add_line_mesh(tri_lines, Color(1.0, 0.5, 0.1))
+
+
+## Step 4+ visualization: subdivided quads.
+func _visualize_subdivided() -> void:
+	var lines := PackedVector3Array()
 	for quad in subdivided_quads:
-		var p0: Vector3 = subdivided_points[quad[0]]
-		var p1: Vector3 = subdivided_points[quad[1]]
-		var p2: Vector3 = subdivided_points[quad[2]]
-		var p3: Vector3 = subdivided_points[quad[3]]
+		var p0 := subdivided_points[quad[0]]; var p1 := subdivided_points[quad[1]]
+		var p2 := subdivided_points[quad[2]]; var p3 := subdivided_points[quad[3]]
 		lines.append(p0); lines.append(p1)
 		lines.append(p1); lines.append(p2)
 		lines.append(p2); lines.append(p3)
 		lines.append(p3); lines.append(p0)
-
 	_add_line_mesh(lines, Color(0.2, 0.9, 0.3))
+	_visualize_points(subdivided_points, subdivided_is_outer_edge)
 
 
 func _add_line_mesh(lines: PackedVector3Array, color: Color) -> void:
@@ -443,20 +542,6 @@ func _add_line_mesh(lines: PackedVector3Array, color: Color) -> void:
 	mesh_inst.mesh = arr_mesh
 	add_child(mesh_inst)
 
-
-## Draws small spheres at each grid point. Outer-edge points are colored differently.
-func _build_point_markers() -> void:
-	var inner_positions: PackedVector3Array = PackedVector3Array()
-	var outer_positions: PackedVector3Array = PackedVector3Array()
-
-	for i in range(subdivided_points.size()):
-		if subdivided_is_outer_edge[i]:
-			outer_positions.append(subdivided_points[i])
-		else:
-			inner_positions.append(subdivided_points[i])
-
-	_create_point_cloud(inner_positions, Color(1.0, 1.0, 0.2), 0.04)
-	_create_point_cloud(outer_positions, Color(1.0, 0.3, 0.2), 0.06)
 
 
 func _create_point_cloud(positions: PackedVector3Array, color: Color, radius: float) -> void:

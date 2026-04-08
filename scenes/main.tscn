@@ -1,14 +1,27 @@
-[gd_scene load_steps=2 format=3 uid="uid://bep2n5mln624u"]
+[gd_scene load_steps=3 format=3 uid="uid://bep2n5mln624u"]
 
 [ext_resource type="Script" uid="uid://bwa7743dqiob1" path="res://scripts/organic_grid.gd" id="1_o5qli"]
+[ext_resource type="Script" path="res://scripts/step_controller.gd" id="2_step_ctrl"]
 
 [node name="Main" type="Node3D"]
 
 [node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 8, 0)
+transform = Transform3D(1, 0, 0, 0, 0.645764, 0.763537, 0, -0.763537, 0.645764, 0, 8, 7.04821)
+fov = 45.0
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 10, 0)
 
 [node name="OrganicGrid" type="Node3D" parent="."]
 script = ExtResource("1_o5qli")
+
+[node name="StepController" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_step_ctrl")
+grid_path = NodePath("../OrganicGrid")
