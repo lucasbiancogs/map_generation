@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3 uid="uid://bep2n5mln624u"]
+[gd_scene load_steps=5 format=3 uid="uid://bep2n5mln624u"]
 
 [ext_resource type="Script" uid="uid://bwa7743dqiob1" path="res://scripts/organic_grid.gd" id="1_o5qli"]
 [ext_resource type="Script" uid="uid://kyknpmdof72h" path="res://scripts/step_controller.gd" id="2_step_ctrl"]
 [ext_resource type="Script" uid="uid://bvxda7p4j5qsv" path="res://scripts/camera_controller.gd" id="3_camera"]
+[ext_resource type="Script" path="res://scripts/tile_hover.gd" id="4_tile_hover"]
 
 [node name="Main" type="Node3D"]
 
@@ -26,4 +27,8 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("2_step_ctrl")
+grid_path = NodePath("../OrganicGrid")
+
+[node name="TileHover" type="Node3D" parent="."]
+script = ExtResource("4_tile_hover")
 grid_path = NodePath("../OrganicGrid")

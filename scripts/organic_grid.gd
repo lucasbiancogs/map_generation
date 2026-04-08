@@ -25,6 +25,8 @@ var subdivided_is_outer_edge: Array[bool] = []
 var subdivided_quads: Array[PackedInt32Array] = []
 ## Connectivity: point index -> array of connected point indices.
 var connectivity: Dictionary = {}
+## Point-to-quad connectivity: point index -> array of quad indices.
+var connected_quads: Dictionary = {}
 
 const STEP_NAMES: PackedStringArray = [
 	"1: Generate Points",
@@ -46,6 +48,37 @@ func run_all() -> void:
 		_execute_step(step)
 	_clear_visualization()
 	_visualize_subdivided()
+	build_collider()
+
+
+## Builds a StaticBody3D collider from the grid quads for raycasting.
+func build_collider() -> void:
+	# Remove existing collider if any.
+	var existing := get_node_or_null("GridCollider")
+	if existing:
+		existing.queue_free()
+
+	var faces := PackedVector3Array()
+	for quad in subdivided_quads:
+		var p0 := subdivided_points[quad[0]]
+		var p1 := subdivided_points[quad[1]]
+		var p2 := subdivided_points[quad[2]]
+		var p3 := subdivided_points[quad[3]]
+		# Two triangles per quad.
+		faces.append(p0); faces.append(p1); faces.append(p2)
+		faces.append(p0); faces.append(p2); faces.append(p3)
+
+	var shape := ConcavePolygonShape3D.new()
+	shape.backface_collision = true
+	shape.set_faces(faces)
+
+	var col_shape := CollisionShape3D.new()
+	col_shape.shape = shape
+
+	var body := StaticBody3D.new()
+	body.name = "GridCollider"
+	body.add_child(col_shape)
+	add_child(body)
 
 
 func reset() -> void:
@@ -58,6 +91,7 @@ func reset() -> void:
 	subdivided_is_outer_edge.clear()
 	subdivided_quads.clear()
 	connectivity.clear()
+	connected_quads.clear()
 	_clear_visualization()
 
 
@@ -419,8 +453,10 @@ func _subdivide_shape(vert_indices: PackedInt32Array, center_idx: int,
 
 func build_connectivity() -> void:
 	connectivity.clear()
+	connected_quads.clear()
 
-	for quad in subdivided_quads:
+	for quad_idx in range(subdivided_quads.size()):
+		var quad: PackedInt32Array = subdivided_quads[quad_idx]
 		for vi in range(4):
 			var pt: int = quad[vi]
 			var right: int = quad[(vi + 1) % 4]
@@ -434,6 +470,13 @@ func build_connectivity() -> void:
 				neighbors.append(right)
 			if not neighbors.has(left):
 				neighbors.append(left)
+
+			# Track which quads touch this point.
+			if not connected_quads.has(pt):
+				connected_quads[pt] = [] as Array[int]
+			var pt_quads: Array[int] = connected_quads[pt]
+			if not pt_quads.has(quad_idx):
+				pt_quads.append(quad_idx)
 
 
 # ===========================================================================
