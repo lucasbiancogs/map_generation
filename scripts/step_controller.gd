@@ -3,6 +3,7 @@ extends Control
 
 @export var grid: BaseGrid
 @export var visualizer: GridVisualizer
+@export var map_gen: MapGeneration
 
 var _current_step: int = 0
 var _step_label: Label
@@ -97,6 +98,32 @@ func _build_ui() -> void:
 	_add_toggle(vbox, "Tile Layers", visualizer.show_tile_layers, func(toggled: bool):
 		visualizer.show_tile_layers = toggled
 		visualizer.refresh()
+	)
+
+	# Noise preview image (hidden by default, shown via toggle).
+	var noise_sep := HSeparator.new()
+	noise_sep.visible = false
+	vbox.add_child(noise_sep)
+
+	var noise_label := Label.new()
+	noise_label.text = "Noise Preview"
+	noise_label.add_theme_font_size_override("font_size", 16)
+	noise_label.visible = false
+	vbox.add_child(noise_label)
+
+	var noise_rect := TextureRect.new()
+	noise_rect.custom_minimum_size = Vector2(180, 180)
+	noise_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	noise_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	noise_rect.visible = false
+	vbox.add_child(noise_rect)
+
+	_add_toggle(vbox, "Noise Map", false, func(toggled: bool):
+		noise_sep.visible = toggled
+		noise_label.visible = toggled
+		noise_rect.visible = toggled
+		if toggled and map_gen and noise_rect.texture == null:
+			noise_rect.texture = map_gen.generate_noise_preview()
 	)
 
 	panel.add_child(vbox)

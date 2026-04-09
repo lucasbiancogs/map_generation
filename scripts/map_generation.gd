@@ -9,8 +9,23 @@ extends Node3D
 ## Maximum height a point can be set to.
 @export_range(1, 5) var max_height: int = 3
 
+@export_group("Noise Height Map")
+## Seed for Perlin noise generation.
+@export var noise_seed: int = 0
+## Noise frequency — higher values produce more variation over shorter distances.
+@export_range(0.01, 2.0) var noise_frequency: float = 0.15
+## Maps normalized noise values (0–1) to height levels.
+## Each entry: {"noise": threshold, "height": level}. Must be sorted by noise ascending.
+@export var noise_height_thresholds: Array[Dictionary] = [
+	{"noise": 0.5, "height": 0},
+	{"noise": 0.8, "height": 1},
+	{"noise": 1, "height": 2},
+]
+
 ## Height per subdivided grid point. 0 = water, 1+ = land/cliff.
 var height_map: PackedInt32Array = PackedInt32Array()
+## Raw normalized noise values (0–1) per subdivided grid point, for visualization.
+var noise_values: PackedFloat32Array = PackedFloat32Array()
 
 ## Per-quad tile layers. Each entry is an array of {layer: int, mesh_index: int}.
 ## mesh_index is a 4-bit marching-squares index (0–15).
@@ -93,6 +108,88 @@ func _init_height_map() -> void:
 	height_map.resize(grid.subdivided_points.size())
 	height_map.fill(0)
 	_compute_quad_canonical_order()
+	_generate_noise_height_map()
+	compute_tile_layers()
+	place_tiles()
+
+
+## Generates the height map from Perlin noise using the configured thresholds.
+func _generate_noise_height_map() -> void:
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	noise.seed = noise_seed
+	noise.frequency = noise_frequency
+
+	noise_values.resize(grid.subdivided_points.size())
+	noise_values.fill(0.0)
+
+	for i in range(grid.subdivided_points.size()):
+		if grid.subdivided_is_outer_edge[i]:
+			height_map[i] = 0
+			noise_values[i] = 0.0
+			continue
+
+		var pos: Vector3 = grid.subdivided_points[i]
+		# FastNoiseLite returns values in [-1, 1]; normalize to [0, 1].
+		var noise_val: float = (noise.get_noise_2d(pos.x, pos.z) + 1.0) * 0.5
+		noise_values[i] = noise_val
+
+		height_map[i] = _noise_to_height(noise_val)
+
+
+## Generates a 2D preview texture of the noise, covering the grid's XZ bounding area.
+func generate_noise_preview(resolution: int = 128) -> ImageTexture:
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	noise.seed = noise_seed
+	noise.frequency = noise_frequency
+
+	# Compute XZ bounds from grid points.
+	var min_x: float = INF
+	var max_x: float = -INF
+	var min_z: float = INF
+	var max_z: float = -INF
+	for pt in grid.subdivided_points:
+		min_x = minf(min_x, pt.x)
+		max_x = maxf(max_x, pt.x)
+		min_z = minf(min_z, pt.z)
+		max_z = maxf(max_z, pt.z)
+
+	var range_x: float = max_x - min_x
+	var range_z: float = max_z - min_z
+	if range_x < 0.001 or range_z < 0.001:
+		return null
+
+	var img := Image.create(resolution, resolution, false, Image.FORMAT_RGB8)
+	for py in range(resolution):
+		for px in range(resolution):
+			var world_x: float = min_x + (float(px) / (resolution - 1)) * range_x
+			var world_z: float = min_z + (float(py) / (resolution - 1)) * range_z
+			var val: float = (noise.get_noise_2d(world_x, world_z) + 1.0) * 0.5
+
+			# Color by height threshold.
+			var height: int = _noise_to_height(val)
+			var color: Color
+			if height == 0:
+				color = Color(0.15, 0.3, 0.7)
+			else:
+				var t: float = float(height - 1) / float(maxi(max_height - 1, 1))
+				color = Color(0.3, 0.8, 0.3).lerp(Color(0.6, 0.4, 0.2), t)
+
+			img.set_pixel(px, py, color)
+
+	return ImageTexture.create_from_image(img)
+
+
+## Converts a normalized noise value (0–1) to a height level using the thresholds.
+func _noise_to_height(noise_val: float) -> int:
+	for entry in noise_height_thresholds:
+		if noise_val <= entry["noise"]:
+			return entry["height"]
+	# Above all thresholds — use the last entry's height.
+	if not noise_height_thresholds.is_empty():
+		return noise_height_thresholds.back()["height"]
+	return 0
 
 
 ## Computes per-quad canonical vertex ordering and rotation offsets.
@@ -197,16 +294,6 @@ func compute_tile_layers() -> void:
 			var b3: int = 1 if h3 > layer else 0
 			var mesh_index: int = b0 | (b1 << 1) | (b2 << 2) | (b3 << 3)
 			layers.append({"layer": layer, "mesh_index": mesh_index})
-
-		if not layers.is_empty():
-			for l in layers:
-				var idx: int = l["mesh_index"]
-				var b: String = "%d%d%d%d" % [(idx >> 3) & 1, (idx >> 2) & 1, (idx >> 1) & 1, idx & 1]
-				var lookup_name: String = _tile_lookup[idx]["scene_name"] if _tile_lookup.has(idx) else "???"
-				print("  Quad %d layer %d: %s (index %d) -> %s rot %d" % [
-					qi, l["layer"], b, idx, lookup_name,
-					_tile_lookup[idx]["rotation"] if _tile_lookup.has(idx) else -1
-				])
 
 		quad_tile_layers.append(layers)
 
