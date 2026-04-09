@@ -29,7 +29,7 @@ script = ExtResource("4_3nd1a")
 grid = NodePath("../RegularGrid")
 map_gen = NodePath("../MapGeneration")
 
-[node name="StepController" type="Control" parent="." node_paths=PackedStringArray("grid", "visualizer")]
+[node name="StepController" type="Control" parent="." node_paths=PackedStringArray("grid", "visualizer", "map_gen")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -40,6 +40,7 @@ mouse_filter = 2
 script = ExtResource("5_onprj")
 grid = NodePath("../RegularGrid")
 visualizer = NodePath("../GridVisualizer")
+map_gen = NodePath("../MapGeneration")
 
 [node name="TileHover" type="Node3D" parent="." node_paths=PackedStringArray("_grid", "_map_gen")]
 script = ExtResource("6_mp2sy")

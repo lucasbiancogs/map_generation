@@ -7,7 +7,7 @@ extends Node3D
 ## Vertical distance between stacked layers.
 @export_range(0.1, 2.0) var layer_height: float = 0.5
 ## Maximum height a point can be set to.
-@export_range(1, 5) var max_height: int = 3
+@export_range(1, 5) var max_height: int = 2
 
 @export_group("Noise Height Map")
 ## Seed for Perlin noise generation.
@@ -18,7 +18,7 @@ extends Node3D
 ## Each entry: {"noise": threshold, "height": level}. Must be sorted by noise ascending.
 @export var noise_height_thresholds: Array[Dictionary] = [
 	{"noise": 0.5, "height": 0},
-	{"noise": 0.8, "height": 1},
+	{"noise": 0.65, "height": 1},
 	{"noise": 1, "height": 2},
 ]
 
@@ -111,6 +111,24 @@ func _init_height_map() -> void:
 	_generate_noise_height_map()
 	compute_tile_layers()
 	place_tiles()
+
+
+## Clears all generated map data (height map, tiles, noise).
+func reset() -> void:
+	height_map.clear()
+	noise_values.clear()
+	quad_tile_layers.clear()
+	_quad_canonical_corners.clear()
+	_quad_rotation_offsets.clear()
+	if _tiles_container:
+		_tiles_container.free()
+		_tiles_container = null
+
+
+## Regenerates everything from scratch using current settings.
+func regenerate() -> void:
+	reset()
+	_init_height_map()
 
 
 ## Generates the height map from Perlin noise using the configured thresholds.

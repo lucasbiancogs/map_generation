@@ -11,6 +11,9 @@ var _prev_button: Button
 var _next_button: Button
 var _reset_button: Button
 var _run_all_button: Button
+var _seed_input: SpinBox
+var _generate_button: Button
+var _noise_rect: TextureRect
 
 func _ready() -> void:
 	_build_ui()
@@ -18,6 +21,7 @@ func _ready() -> void:
 	# Wait for MapGeneration to finish (it awaits one frame after grid).
 	await get_tree().process_frame
 	await get_tree().process_frame
+	_refresh_noise_preview()
 	visualizer.refresh()
 	_update_ui()
 
@@ -32,6 +36,7 @@ func _build_ui() -> void:
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 6)
 
+	# --- Grid Steps ---
 	_step_label = Label.new()
 	_step_label.add_theme_font_size_override("font_size", 18)
 	vbox.add_child(_step_label)
@@ -66,9 +71,38 @@ func _build_ui() -> void:
 
 	vbox.add_child(hbox2)
 
-	# Visibility toggles.
-	var sep := HSeparator.new()
-	vbox.add_child(sep)
+	# --- Map Generation ---
+	vbox.add_child(HSeparator.new())
+
+	var map_label := Label.new()
+	map_label.text = "Map Generation"
+	map_label.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(map_label)
+
+	var seed_hbox := HBoxContainer.new()
+	seed_hbox.add_theme_constant_override("separation", 6)
+
+	var seed_label := Label.new()
+	seed_label.text = "Seed:"
+	seed_hbox.add_child(seed_label)
+
+	_seed_input = SpinBox.new()
+	_seed_input.min_value = 0
+	_seed_input.max_value = 99999
+	_seed_input.step = 1
+	_seed_input.value = map_gen.noise_seed if map_gen else 0
+	_seed_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	seed_hbox.add_child(_seed_input)
+
+	vbox.add_child(seed_hbox)
+
+	_generate_button = Button.new()
+	_generate_button.text = "Generate Map"
+	_generate_button.pressed.connect(_on_generate)
+	vbox.add_child(_generate_button)
+
+	# --- Visibility Toggles ---
+	vbox.add_child(HSeparator.new())
 
 	var toggles_label := Label.new()
 	toggles_label.text = "Visibility"
@@ -100,31 +134,19 @@ func _build_ui() -> void:
 		visualizer.refresh()
 	)
 
-	# Noise preview image (hidden by default, shown via toggle).
-	var noise_sep := HSeparator.new()
-	noise_sep.visible = false
-	vbox.add_child(noise_sep)
+	# --- Noise Preview ---
+	vbox.add_child(HSeparator.new())
 
 	var noise_label := Label.new()
 	noise_label.text = "Noise Preview"
 	noise_label.add_theme_font_size_override("font_size", 16)
-	noise_label.visible = false
 	vbox.add_child(noise_label)
 
-	var noise_rect := TextureRect.new()
-	noise_rect.custom_minimum_size = Vector2(180, 180)
-	noise_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	noise_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	noise_rect.visible = false
-	vbox.add_child(noise_rect)
-
-	_add_toggle(vbox, "Noise Map", false, func(toggled: bool):
-		noise_sep.visible = toggled
-		noise_label.visible = toggled
-		noise_rect.visible = toggled
-		if toggled and map_gen and noise_rect.texture == null:
-			noise_rect.texture = map_gen.generate_noise_preview()
-	)
+	_noise_rect = TextureRect.new()
+	_noise_rect.custom_minimum_size = Vector2(180, 180)
+	_noise_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_noise_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	vbox.add_child(_noise_rect)
 
 	panel.add_child(vbox)
 	add_child(panel)
@@ -152,6 +174,7 @@ func _on_prev() -> void:
 		return
 	_current_step -= 1
 	grid.reset()
+	map_gen.reset()
 	for step in range(1, _current_step + 1):
 		grid.run_step(step)
 	visualizer.refresh()
@@ -161,16 +184,40 @@ func _on_prev() -> void:
 func _on_reset() -> void:
 	_current_step = 0
 	grid.reset()
+	map_gen.reset()
 	visualizer.refresh()
 	_update_ui()
 
 
 func _on_run_all() -> void:
 	grid.reset()
+	map_gen.reset()
 	grid.run_all()
 	_current_step = OrganicGrid.TOTAL_STEPS
+	map_gen.regenerate()
+	_refresh_noise_preview()
 	visualizer.refresh()
 	_update_ui()
+
+
+func _on_generate() -> void:
+	if not map_gen:
+		return
+	map_gen.noise_seed = int(_seed_input.value)
+	# Ensure grid is fully built before generating.
+	if _current_step < OrganicGrid.TOTAL_STEPS:
+		grid.reset()
+		grid.run_all()
+		_current_step = OrganicGrid.TOTAL_STEPS
+	map_gen.regenerate()
+	_refresh_noise_preview()
+	visualizer.refresh()
+	_update_ui()
+
+
+func _refresh_noise_preview() -> void:
+	if map_gen and _noise_rect:
+		_noise_rect.texture = map_gen.generate_noise_preview()
 
 
 func _update_ui() -> void:
@@ -181,3 +228,7 @@ func _update_ui() -> void:
 
 	_prev_button.disabled = _current_step <= 0
 	_next_button.disabled = _current_step >= OrganicGrid.TOTAL_STEPS
+	_generate_button.disabled = _current_step < OrganicGrid.TOTAL_STEPS
+
+	if map_gen:
+		_seed_input.value = map_gen.noise_seed

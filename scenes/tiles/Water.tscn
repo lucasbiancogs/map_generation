@@ -5,3 +5,4 @@
 [node name="Water" type="Node3D"]
 
 [node name="Mesh" parent="." instance=ExtResource("1_mesh")]
+transform = Transform3D(3, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0)

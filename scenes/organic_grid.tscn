@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://bep2n5mln624u"]
+[gd_scene load_steps=8 format=3 uid="uid://bep2n5mln624u"]
 
 [ext_resource type="Script" uid="uid://bvxda7p4j5qsv" path="res://scripts/camera_controller.gd" id="1_e5vl1"]
 [ext_resource type="Script" uid="uid://bwa7743dqiob1" path="res://scripts/organic_grid.gd" id="2_enksl"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://dgk776q3lhcem" path="res://scripts/grid_visualizer.gd" id="4_0chaf"]
 [ext_resource type="Script" uid="uid://kyknpmdof72h" path="res://scripts/step_controller.gd" id="5_dibcg"]
 [ext_resource type="Script" uid="uid://cvxviq117ve3p" path="res://scripts/tile_hover.gd" id="6_uk1j6"]
+[ext_resource type="PackedScene" uid="uid://c730m1a2almku" path="res://scenes/tiles/Water.tscn" id="7_enksl"]
 
 [node name="Main" type="Node3D"]
 
@@ -26,11 +27,12 @@ grid = NodePath("../OrganicGrid")
 layer_height = 1.0
 
 [node name="GridVisualizer" type="Node3D" parent="." node_paths=PackedStringArray("grid", "map_gen")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 script = ExtResource("4_0chaf")
 grid = NodePath("../OrganicGrid")
 map_gen = NodePath("../MapGeneration")
 
-[node name="StepController" type="Control" parent="." node_paths=PackedStringArray("grid", "visualizer")]
+[node name="StepController" type="Control" parent="." node_paths=PackedStringArray("grid", "visualizer", "map_gen")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -41,8 +43,12 @@ mouse_filter = 2
 script = ExtResource("5_dibcg")
 grid = NodePath("../OrganicGrid")
 visualizer = NodePath("../GridVisualizer")
+map_gen = NodePath("../MapGeneration")
 
 [node name="TileHover" type="Node3D" parent="." node_paths=PackedStringArray("_grid", "_map_gen")]
 script = ExtResource("6_uk1j6")
 _grid = NodePath("../OrganicGrid")
 _map_gen = NodePath("../MapGeneration")
+
+[node name="Water" parent="." instance=ExtResource("7_enksl")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
