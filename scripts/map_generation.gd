@@ -252,6 +252,7 @@ func place_tiles() -> void:
 
 			var tile: Node3D = _tile_scenes[scene_name].instantiate()
 			tile.position = center + Vector3.UP * layer * layer_height
+			_set_variation_seeds(tile, qi * 97 + layer * 31)
 			_tiles_container.add_child(tile)
 			_deform_tile_to_quad(tile, qi, rotation_steps)
 
@@ -289,6 +290,14 @@ func _deform_tile_to_quad(tile: Node3D, qi: int, rotation_steps: int) -> void:
 	# Deform each mesh.
 	for mi in mesh_instances:
 		_deform_mesh_instance(mi, tile, ref_aabb, target_xz)
+
+
+## Sets variation_seed on all MeshVariation nodes in the tile before it enters the tree.
+func _set_variation_seeds(node: Node, base_seed: int) -> void:
+	if node is MeshVariation:
+		node.variation_seed = base_seed
+	for child in node.get_children():
+		_set_variation_seeds(child, base_seed)
 
 
 ## Recursively finds all MeshInstance3D nodes under the given node.
