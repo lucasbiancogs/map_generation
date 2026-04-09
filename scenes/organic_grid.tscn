@@ -27,7 +27,7 @@ grid = NodePath("../OrganicGrid")
 layer_height = 1.0
 
 [node name="GridVisualizer" type="Node3D" parent="." node_paths=PackedStringArray("grid", "map_gen")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 script = ExtResource("4_0chaf")
 grid = NodePath("../OrganicGrid")
 map_gen = NodePath("../MapGeneration")

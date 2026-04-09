@@ -129,10 +129,6 @@ func _build_ui() -> void:
 		visualizer.show_height_map = toggled
 		visualizer.refresh()
 	)
-	_add_toggle(vbox, "Tile Layers", visualizer.show_tile_layers, func(toggled: bool):
-		visualizer.show_tile_layers = toggled
-		visualizer.refresh()
-	)
 
 	# --- Noise Preview ---
 	vbox.add_child(HSeparator.new())

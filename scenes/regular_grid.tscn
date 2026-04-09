@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://vy80jqm1rern"]
+[gd_scene load_steps=8 format=3 uid="uid://vy80jqm1rern"]
 
 [ext_resource type="Script" uid="uid://bvxda7p4j5qsv" path="res://scripts/camera_controller.gd" id="1_7grxs"]
 [ext_resource type="Script" uid="uid://bnp3pikraoh1b" path="res://scripts/regular_grid.gd" id="2_y4x64"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://dgk776q3lhcem" path="res://scripts/grid_visualizer.gd" id="4_3nd1a"]
 [ext_resource type="Script" uid="uid://kyknpmdof72h" path="res://scripts/step_controller.gd" id="5_onprj"]
 [ext_resource type="Script" uid="uid://cvxviq117ve3p" path="res://scripts/tile_hover.gd" id="6_mp2sy"]
+[ext_resource type="PackedScene" uid="uid://c730m1a2almku" path="res://scenes/tiles/Water.tscn" id="7_y4x64"]
 
 [node name="Main" type="Node3D"]
 
@@ -25,6 +26,7 @@ script = ExtResource("3_bt1lh")
 grid = NodePath("../RegularGrid")
 
 [node name="GridVisualizer" type="Node3D" parent="." node_paths=PackedStringArray("grid", "map_gen")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.5, 0)
 script = ExtResource("4_3nd1a")
 grid = NodePath("../RegularGrid")
 map_gen = NodePath("../MapGeneration")
@@ -46,3 +48,6 @@ map_gen = NodePath("../MapGeneration")
 script = ExtResource("6_mp2sy")
 _grid = NodePath("../RegularGrid")
 _map_gen = NodePath("../MapGeneration")
+
+[node name="Water" parent="." instance=ExtResource("7_y4x64")]
+transform = Transform3D(50, 0, 0, 0, 1, 0, 0, 0, 50, 0, 0.8, 0)

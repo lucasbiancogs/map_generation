@@ -11,7 +11,6 @@ var show_points: bool = true
 var show_tile_edges: bool = true
 var show_connectivity: bool = false
 var show_height_map: bool = false
-var show_tile_layers: bool = false
 
 
 func refresh() -> void:
@@ -50,8 +49,6 @@ func refresh() -> void:
 		_draw_tile_edges()
 	if show_height_map and map_gen and not map_gen.height_map.is_empty():
 		_draw_height_map()
-	if show_tile_layers and map_gen and not map_gen.quad_tile_layers.is_empty():
-		_draw_tile_layers()
 
 
 func _clear() -> void:
@@ -71,8 +68,8 @@ func _draw_points(pts: Array[Vector3], outer: Array[bool]) -> void:
 			outer_pos.append(pts[i])
 		else:
 			inner_pos.append(pts[i])
-	_create_point_cloud(inner_pos, Color(1.0, 1.0, 0.2), 0.03)
-	_create_point_cloud(outer_pos, Color(1.0, 0.3, 0.2), 0.04)
+	_create_point_cloud(inner_pos, Color(1.0, 1.0, 0.0), 0.03)
+	_create_point_cloud(outer_pos, Color(1.0, 1.0, 0.0), 0.04)
 
 
 func _draw_triangles(organic: OrganicGrid) -> void:
@@ -85,7 +82,7 @@ func _draw_triangles(organic: OrganicGrid) -> void:
 		lines.append(organic.points[i0]); lines.append(organic.points[i1])
 		lines.append(organic.points[i1]); lines.append(organic.points[i2])
 		lines.append(organic.points[i2]); lines.append(organic.points[i0])
-	_add_line_mesh(lines, Color(0.3, 0.7, 1.0))
+	_add_line_mesh(lines, Color(1.0, 1.0, 0.0))
 
 
 func _draw_quads_and_tris(organic: OrganicGrid) -> void:
@@ -97,7 +94,7 @@ func _draw_quads_and_tris(organic: OrganicGrid) -> void:
 		quad_lines.append(p1); quad_lines.append(p2)
 		quad_lines.append(p2); quad_lines.append(p3)
 		quad_lines.append(p3); quad_lines.append(p0)
-	_add_line_mesh(quad_lines, Color(0.2, 0.9, 0.3))
+	_add_line_mesh(quad_lines, Color(1.0, 1.0, 0.0))
 
 	var tri_lines := PackedVector3Array()
 	for tri_idx in organic.unmergeable_triangle_indices:
@@ -105,7 +102,7 @@ func _draw_quads_and_tris(organic: OrganicGrid) -> void:
 		tri_lines.append(organic.points[v[0]]); tri_lines.append(organic.points[v[1]])
 		tri_lines.append(organic.points[v[1]]); tri_lines.append(organic.points[v[2]])
 		tri_lines.append(organic.points[v[2]]); tri_lines.append(organic.points[v[0]])
-	_add_line_mesh(tri_lines, Color(1.0, 0.5, 0.1))
+	_add_line_mesh(tri_lines, Color(1.0, 1.0, 0.0))
 
 
 func _draw_grid_wireframe() -> void:
@@ -119,7 +116,7 @@ func _draw_grid_wireframe() -> void:
 		lines.append(p1); lines.append(p2)
 		lines.append(p2); lines.append(p3)
 		lines.append(p3); lines.append(p0)
-	_add_line_mesh(lines, Color(0.2, 0.9, 0.3))
+	_add_line_mesh(lines, Color(1.0, 1.0, 0.0))
 
 
 func _draw_tile_edges() -> void:
@@ -137,7 +134,7 @@ func _draw_tile_edges() -> void:
 			lines.append(corners[i] + lift)
 			lines.append(corners[next_i] + lift)
 
-	_add_line_mesh(lines, Color(0.9, 0.4, 0.4))
+	_add_line_mesh(lines, Color(1.0, 1.0, 0.0))
 
 
 func _draw_height_map() -> void:
@@ -154,72 +151,8 @@ func _draw_height_map() -> void:
 		groups[h].append(grid.subdivided_points[i])
 
 	for h in groups.keys():
-		var color: Color
-		if h == 0:
-			color = Color(0.2, 0.4, 0.9)
-		elif max_h <= 1:
-			color = Color(0.3, 0.8, 0.3)
-		else:
-			var t: float = float(h - 1) / float(maxi(max_h - 1, 1))
-			color = Color(0.3, 0.8, 0.3).lerp(Color(0.6, 0.4, 0.2), t)
-		_create_point_cloud(groups[h], color, 0.04)
+		_create_point_cloud(groups[h], Color(1.0, 1.0, 0.0), 0.04)
 
-
-func _draw_tile_layers() -> void:
-	var verts := PackedVector3Array()
-	var colors := PackedColorArray()
-	var normals := PackedVector3Array()
-	var lift := Vector3.UP * 0.003
-
-	for qi in range(grid.subdivided_quads.size()):
-		if qi >= map_gen.quad_tile_layers.size():
-			break
-		var layers: Array = map_gen.quad_tile_layers[qi]
-		if layers.is_empty():
-			continue
-
-		var mesh_index: int = layers[0]["mesh_index"]
-		var color: Color
-		if mesh_index == 0:
-			color = Color(0.15, 0.3, 0.7, 0.7)
-		elif mesh_index == 15:
-			color = Color(0.3, 0.7, 0.2, 0.7)
-		else:
-			color = Color(0.9, 0.7, 0.2, 0.7)
-
-		var quad: PackedInt32Array = grid.subdivided_quads[qi]
-		var p0: Vector3 = grid.subdivided_points[quad[0]] + lift
-		var p1: Vector3 = grid.subdivided_points[quad[1]] + lift
-		var p2: Vector3 = grid.subdivided_points[quad[2]] + lift
-		var p3: Vector3 = grid.subdivided_points[quad[3]] + lift
-
-		verts.append(p0); verts.append(p1); verts.append(p2)
-		verts.append(p0); verts.append(p2); verts.append(p3)
-		for _i in range(6):
-			colors.append(color)
-			normals.append(Vector3.UP)
-
-	if verts.is_empty():
-		return
-
-	var arr_mesh := ArrayMesh.new()
-	var arrays := []
-	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = verts
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_COLOR] = colors
-	arr_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	arr_mesh.surface_set_material(0, mat)
-
-	var mesh_inst := MeshInstance3D.new()
-	mesh_inst.mesh = arr_mesh
-	add_child(mesh_inst)
 
 
 func _draw_connectivity() -> void:
@@ -231,7 +164,7 @@ func _draw_connectivity() -> void:
 			var n_pos: Vector3 = grid.subdivided_points[n]
 			lines.append(pos + Vector3.UP * 0.01)
 			lines.append(n_pos + Vector3.UP * 0.01)
-	_add_line_mesh(lines, Color(1.0, 0.2, 0.6, 0.6))
+	_add_line_mesh(lines, Color(1.0, 1.0, 0.0, 0.6))
 
 
 # ===========================================================================
