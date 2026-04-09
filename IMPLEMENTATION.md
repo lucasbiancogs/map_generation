@@ -31,14 +31,11 @@
 - [x] **Marching-squares mesh lookup**
   For each quad, read 4 corner heights. For each height transition layer, reduce to binary (above/below), compute 4-bit index (0–15). Stored in `quad_tile_layers` on MapGeneration.
 
-- [ ] **Layer stacking**
-  Multi-height cliffs: iterate from min to max height per quad, place one mesh per layer at the corresponding vertical offset.
+- [x] **Import FBX tile assets + placement**
+  FBX meshes imported to `assets/meshes/`. Lookup table maps 4-bit index to base mesh + rotation. Tiles placed per quad with vertical layer stacking.
 
-- [ ] **Import FBX tile assets**
-  Import the 16 `Dual_Grid_*.fbx` meshes + `Water.fbx` into the Godot project.
-
-- [ ] **Lattice deformation**
-  Deform tile meshes to match the organic grid shape using 8 control points (4 bottom at grid vertices, 4 top elevated by tile height).
+- [x] **Lattice deformation**
+  Trilinear interpolation with 8 control points (4 bottom at quad corners, 4 top elevated by layer_height). Mesh vertices normalized to [0,1], then mapped to deformed space.
 
 ## Visualization
 

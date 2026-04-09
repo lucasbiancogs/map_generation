@@ -1,5 +1,5 @@
 class_name OrganicGrid
-extends Node3D
+extends BaseGrid
 
 ## Distance from center to hex vertex.
 @export_range(0.5, 20.0) var hex_size: float = 1.0
@@ -10,26 +10,12 @@ extends Node3D
 ## Relaxation iterations (Laplacian smoothing passes).
 @export_range(0, 200) var relaxation_iterations: int = 10
 
-## Generated grid points (position + outer edge flag).
+## Intermediate data (organic grid specific).
 var points: Array[Vector3] = []
 var is_outer_edge: Array[bool] = []
-## Triangle indices (each group of 3 ints = one triangle).
 var triangles: PackedInt32Array = PackedInt32Array()
-## Quad vertex indices (each group of 4 ints = one quad).
 var quads: Array[PackedInt32Array] = []
-## Triangles that couldn't be merged (indices into the triangles list).
 var unmergeable_triangle_indices: Array[int] = []
-## Subdivided grid (final output of the subdivision step).
-var subdivided_points: Array[Vector3] = []
-var subdivided_is_outer_edge: Array[bool] = []
-var subdivided_quads: Array[PackedInt32Array] = []
-## Connectivity: point index -> array of connected point indices.
-var connectivity: Dictionary = {}
-## Point-to-quad connectivity: point index -> array of quad indices.
-var connected_quads: Dictionary = {}
-
-## Tracks which step we're currently displaying.
-var current_step: int = 0
 
 const STEP_NAMES: PackedStringArray = [
 	"1: Generate Points",
@@ -54,48 +40,14 @@ func run_all() -> void:
 	build_collider()
 
 
-## Builds a StaticBody3D collider from the grid quads for raycasting.
-func build_collider() -> void:
-	# Remove existing collider if any.
-	var existing := get_node_or_null("GridCollider")
-	if existing:
-		existing.queue_free()
-
-	var faces := PackedVector3Array()
-	for quad in subdivided_quads:
-		var p0 := subdivided_points[quad[0]]
-		var p1 := subdivided_points[quad[1]]
-		var p2 := subdivided_points[quad[2]]
-		var p3 := subdivided_points[quad[3]]
-		# Two triangles per quad.
-		faces.append(p0); faces.append(p1); faces.append(p2)
-		faces.append(p0); faces.append(p2); faces.append(p3)
-
-	var shape := ConcavePolygonShape3D.new()
-	shape.backface_collision = true
-	shape.set_faces(faces)
-
-	var col_shape := CollisionShape3D.new()
-	col_shape.shape = shape
-
-	var body := StaticBody3D.new()
-	body.name = "GridCollider"
-	body.add_child(col_shape)
-	add_child(body)
-
 
 func reset() -> void:
-	current_step = 0
+	super.reset()
 	points.clear()
 	is_outer_edge.clear()
 	triangles.clear()
 	quads.clear()
 	unmergeable_triangle_indices.clear()
-	subdivided_points.clear()
-	subdivided_is_outer_edge.clear()
-	subdivided_quads.clear()
-	connectivity.clear()
-	connected_quads.clear()
 
 
 func run_step(step: int) -> void:
@@ -434,38 +386,6 @@ func _subdivide_shape(vert_indices: PackedInt32Array, center_idx: int,
 
 
 # ===========================================================================
-# Step 5 — Build connectivity info
-# ===========================================================================
-
-func build_connectivity() -> void:
-	connectivity.clear()
-	connected_quads.clear()
-
-	for quad_idx in range(subdivided_quads.size()):
-		var quad: PackedInt32Array = subdivided_quads[quad_idx]
-		for vi in range(4):
-			var pt: int = quad[vi]
-			var right: int = quad[(vi + 1) % 4]
-			var left: int = quad[(vi + 3) % 4]
-
-			if not connectivity.has(pt):
-				connectivity[pt] = [] as Array[int]
-
-			var neighbors: Array[int] = connectivity[pt]
-			if not neighbors.has(right):
-				neighbors.append(right)
-			if not neighbors.has(left):
-				neighbors.append(left)
-
-			# Track which quads touch this point.
-			if not connected_quads.has(pt):
-				connected_quads[pt] = [] as Array[int]
-			var pt_quads: Array[int] = connected_quads[pt]
-			if not pt_quads.has(quad_idx):
-				pt_quads.append(quad_idx)
-
-
-# ===========================================================================
 # Step 6 — Relaxation (Laplacian smoothing)
 # ===========================================================================
 
@@ -484,35 +404,3 @@ func apply_relaxation() -> void:
 				avg += subdivided_points[n]
 			avg /= neighbors.size()
 			subdivided_points[pt_idx] = avg
-
-
-# ===========================================================================
-# Tile mesh construction (dual-grid)
-# ===========================================================================
-
-## Returns sorted corner points for a tile centered on the given point index.
-## Corners are midpoints to neighbors + centers of touching quads, sorted by angle.
-func get_tile_corners(center_idx: int) -> Array[Vector3]:
-	var center := subdivided_points[center_idx]
-	var corners: Array[Vector3] = []
-
-	# Midpoints between center and each connected neighbor.
-	if connectivity.has(center_idx):
-		var neighbors: Array[int] = connectivity[center_idx]
-		for n in neighbors:
-			corners.append((center + subdivided_points[n]) * 0.5)
-
-	# Centers of each quad touching this point.
-	if connected_quads.has(center_idx):
-		var quad_indices: Array[int] = connected_quads[center_idx]
-		for qi in quad_indices:
-			var quad: PackedInt32Array = subdivided_quads[qi]
-			var qc := (subdivided_points[quad[0]] + subdivided_points[quad[1]]
-				+ subdivided_points[quad[2]] + subdivided_points[quad[3]]) * 0.25
-			corners.append(qc)
-
-	# Sort by angle around center.
-	corners.sort_custom(func(a: Vector3, b: Vector3) -> bool:
-		return atan2(a.z - center.z, a.x - center.x) < atan2(b.z - center.z, b.x - center.x)
-	)
-	return corners

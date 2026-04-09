@@ -1,0 +1,47 @@
+[gd_scene load_steps=7 format=3 uid="uid://vy80jqm1rern"]
+
+[ext_resource type="Script" uid="uid://bvxda7p4j5qsv" path="res://scripts/camera_controller.gd" id="1_7grxs"]
+[ext_resource type="Script" uid="uid://bnp3pikraoh1b" path="res://scripts/regular_grid.gd" id="2_y4x64"]
+[ext_resource type="Script" uid="uid://bvqh0o68gxxrf" path="res://scripts/map_generation.gd" id="3_bt1lh"]
+[ext_resource type="Script" uid="uid://dgk776q3lhcem" path="res://scripts/grid_visualizer.gd" id="4_3nd1a"]
+[ext_resource type="Script" uid="uid://kyknpmdof72h" path="res://scripts/step_controller.gd" id="5_onprj"]
+[ext_resource type="Script" uid="uid://cvxviq117ve3p" path="res://scripts/tile_hover.gd" id="6_mp2sy"]
+
+[node name="Main" type="Node3D"]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 5, 10, 0)
+fov = 45.0
+script = ExtResource("1_7grxs")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 10, 0)
+
+[node name="RegularGrid" type="Node3D" parent="."]
+script = ExtResource("2_y4x64")
+
+[node name="MapGeneration" type="Node3D" parent="." node_paths=PackedStringArray("grid")]
+script = ExtResource("3_bt1lh")
+grid = NodePath("../RegularGrid")
+
+[node name="GridVisualizer" type="Node3D" parent="." node_paths=PackedStringArray("grid", "map_gen")]
+script = ExtResource("4_3nd1a")
+grid = NodePath("../RegularGrid")
+map_gen = NodePath("../MapGeneration")
+
+[node name="StepController" type="Control" parent="." node_paths=PackedStringArray("grid", "visualizer")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("5_onprj")
+grid = NodePath("../RegularGrid")
+visualizer = NodePath("../GridVisualizer")
+
+[node name="TileHover" type="Node3D" parent="." node_paths=PackedStringArray("_grid", "_map_gen")]
+script = ExtResource("6_mp2sy")
+_grid = NodePath("../RegularGrid")
+_map_gen = NodePath("../MapGeneration")

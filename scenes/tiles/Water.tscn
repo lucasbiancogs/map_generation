@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://c730m1a2almku"]
+
+[ext_resource type="PackedScene" uid="uid://c6g24o7fs71el" path="res://assets/meshes/Water.fbx" id="1_mesh"]
+
+[node name="Water" type="Node3D"]
+
+[node name="Mesh" parent="." instance=ExtResource("1_mesh")]

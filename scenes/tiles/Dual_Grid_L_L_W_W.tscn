@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://dhypaq5ntori1"]
+
+[ext_resource type="PackedScene" uid="uid://pyr2gnhw1qr8" path="res://assets/meshes/Dual_Grid_L_L_W_W.fbx" id="1_mesh"]
+
+[node name="Dual_Grid_L_L_W_W" type="Node3D"]
+
+[node name="Mesh" parent="." instance=ExtResource("1_mesh")]
+transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 0, 0)

@@ -1,8 +1,8 @@
-## This class is designed only for debug pourposes.
-class_name OrganicGridVisualizer
+## This class is designed only for debug purposes.
+class_name GridVisualizer
 extends Node3D
 
-@export var grid: OrganicGrid
+@export var grid: BaseGrid
 @export var map_gen: MapGeneration
 
 ## Visualization toggles.
@@ -13,40 +13,45 @@ var show_connectivity: bool = false
 var show_height_map: bool = false
 var show_tile_layers: bool = false
 
-## Rebuilds visualization for the grid's current step, respecting toggle flags.
+
 func refresh() -> void:
 	_clear()
 	if not grid or grid.current_step == 0:
 		return
 
-	match grid.current_step:
-		1:
-			if show_points:
-				_draw_points(grid.points, grid.is_outer_edge)
-		2:
-			if show_grid_wireframe:
-				_draw_triangles()
-			if show_points:
-				_draw_points(grid.points, grid.is_outer_edge)
-		3:
-			if show_grid_wireframe:
-				_draw_quads_and_tris()
-			if show_points:
-				_draw_points(grid.points, grid.is_outer_edge)
-		_:
-			# Steps 4+ use subdivided data.
-			if show_grid_wireframe:
-				_draw_grid_wireframe()
-			if show_points:
-				_draw_points(grid.subdivided_points, grid.subdivided_is_outer_edge)
-			if show_connectivity and grid.current_step >= 5:
-				_draw_connectivity()
-			if show_tile_edges and grid.current_step >= 7:
-				_draw_tile_edges()
-			if show_height_map and map_gen and not map_gen.height_map.is_empty():
-				_draw_height_map()
-			if show_tile_layers and map_gen and not map_gen.quad_tile_layers.is_empty():
-				_draw_tile_layers()
+	var organic := grid as OrganicGrid
+
+	# Steps 1-3 are OrganicGrid-specific.
+	if organic and grid.current_step <= 3:
+		match grid.current_step:
+			1:
+				if show_points:
+					_draw_points(organic.points, organic.is_outer_edge)
+			2:
+				if show_grid_wireframe:
+					_draw_triangles(organic)
+				if show_points:
+					_draw_points(organic.points, organic.is_outer_edge)
+			3:
+				if show_grid_wireframe:
+					_draw_quads_and_tris(organic)
+				if show_points:
+					_draw_points(organic.points, organic.is_outer_edge)
+		return
+
+	# Steps 4+ use shared BaseGrid data — works with any grid.
+	if show_grid_wireframe:
+		_draw_grid_wireframe()
+	if show_points:
+		_draw_points(grid.subdivided_points, grid.subdivided_is_outer_edge)
+	if show_connectivity and grid.current_step >= 5:
+		_draw_connectivity()
+	if show_tile_edges and grid.current_step >= 7:
+		_draw_tile_edges()
+	if show_height_map and map_gen and not map_gen.height_map.is_empty():
+		_draw_height_map()
+	if show_tile_layers and map_gen and not map_gen.quad_tile_layers.is_empty():
+		_draw_tile_layers()
 
 
 func _clear() -> void:
@@ -70,24 +75,24 @@ func _draw_points(pts: Array[Vector3], outer: Array[bool]) -> void:
 	_create_point_cloud(outer_pos, Color(1.0, 0.3, 0.2), 0.04)
 
 
-func _draw_triangles() -> void:
+func _draw_triangles(organic: OrganicGrid) -> void:
 	var lines := PackedVector3Array()
-	var tri_count: int = grid.triangles.size() / 3
+	var tri_count: int = organic.triangles.size() / 3
 	for t in range(tri_count):
-		var i0: int = grid.triangles[t * 3]
-		var i1: int = grid.triangles[t * 3 + 1]
-		var i2: int = grid.triangles[t * 3 + 2]
-		lines.append(grid.points[i0]); lines.append(grid.points[i1])
-		lines.append(grid.points[i1]); lines.append(grid.points[i2])
-		lines.append(grid.points[i2]); lines.append(grid.points[i0])
+		var i0: int = organic.triangles[t * 3]
+		var i1: int = organic.triangles[t * 3 + 1]
+		var i2: int = organic.triangles[t * 3 + 2]
+		lines.append(organic.points[i0]); lines.append(organic.points[i1])
+		lines.append(organic.points[i1]); lines.append(organic.points[i2])
+		lines.append(organic.points[i2]); lines.append(organic.points[i0])
 	_add_line_mesh(lines, Color(0.3, 0.7, 1.0))
 
 
-func _draw_quads_and_tris() -> void:
+func _draw_quads_and_tris(organic: OrganicGrid) -> void:
 	var quad_lines := PackedVector3Array()
-	for quad in grid.quads:
-		var p0 := grid.points[quad[0]]; var p1 := grid.points[quad[1]]
-		var p2 := grid.points[quad[2]]; var p3 := grid.points[quad[3]]
+	for quad in organic.quads:
+		var p0: Vector3 = organic.points[quad[0]]; var p1: Vector3 = organic.points[quad[1]]
+		var p2: Vector3 = organic.points[quad[2]]; var p3: Vector3 = organic.points[quad[3]]
 		quad_lines.append(p0); quad_lines.append(p1)
 		quad_lines.append(p1); quad_lines.append(p2)
 		quad_lines.append(p2); quad_lines.append(p3)
@@ -95,19 +100,21 @@ func _draw_quads_and_tris() -> void:
 	_add_line_mesh(quad_lines, Color(0.2, 0.9, 0.3))
 
 	var tri_lines := PackedVector3Array()
-	for tri_idx in grid.unmergeable_triangle_indices:
-		var v := grid._get_tri_vertices(tri_idx)
-		tri_lines.append(grid.points[v[0]]); tri_lines.append(grid.points[v[1]])
-		tri_lines.append(grid.points[v[1]]); tri_lines.append(grid.points[v[2]])
-		tri_lines.append(grid.points[v[2]]); tri_lines.append(grid.points[v[0]])
+	for tri_idx in organic.unmergeable_triangle_indices:
+		var v := organic._get_tri_vertices(tri_idx)
+		tri_lines.append(organic.points[v[0]]); tri_lines.append(organic.points[v[1]])
+		tri_lines.append(organic.points[v[1]]); tri_lines.append(organic.points[v[2]])
+		tri_lines.append(organic.points[v[2]]); tri_lines.append(organic.points[v[0]])
 	_add_line_mesh(tri_lines, Color(1.0, 0.5, 0.1))
 
 
 func _draw_grid_wireframe() -> void:
 	var lines := PackedVector3Array()
 	for quad in grid.subdivided_quads:
-		var p0 := grid.subdivided_points[quad[0]]; var p1 := grid.subdivided_points[quad[1]]
-		var p2 := grid.subdivided_points[quad[2]]; var p3 := grid.subdivided_points[quad[3]]
+		var p0: Vector3 = grid.subdivided_points[quad[0]]
+		var p1: Vector3 = grid.subdivided_points[quad[1]]
+		var p2: Vector3 = grid.subdivided_points[quad[2]]
+		var p3: Vector3 = grid.subdivided_points[quad[3]]
 		lines.append(p0); lines.append(p1)
 		lines.append(p1); lines.append(p2)
 		lines.append(p2); lines.append(p3)
@@ -134,13 +141,12 @@ func _draw_tile_edges() -> void:
 
 
 func _draw_height_map() -> void:
-	# Group points by height and draw each group with a distinct color.
 	var max_h: int = 0
 	for h in map_gen.height_map:
 		if h > max_h:
 			max_h = h
 
-	var groups: Dictionary = {}  # height -> PackedVector3Array
+	var groups: Dictionary = {}
 	for i in range(map_gen.height_map.size()):
 		var h: int = map_gen.height_map[i]
 		if not groups.has(h):
@@ -150,18 +156,16 @@ func _draw_height_map() -> void:
 	for h in groups.keys():
 		var color: Color
 		if h == 0:
-			color = Color(0.2, 0.4, 0.9)  # water = blue
+			color = Color(0.2, 0.4, 0.9)
 		elif max_h <= 1:
-			color = Color(0.3, 0.8, 0.3)  # land = green
+			color = Color(0.3, 0.8, 0.3)
 		else:
 			var t: float = float(h - 1) / float(maxi(max_h - 1, 1))
-			color = Color(0.3, 0.8, 0.3).lerp(Color(0.6, 0.4, 0.2), t)  # green -> brown
+			color = Color(0.3, 0.8, 0.3).lerp(Color(0.6, 0.4, 0.2), t)
 		_create_point_cloud(groups[h], color, 0.04)
 
 
 func _draw_tile_layers() -> void:
-	# Color each quad face by its bottom-layer marching-squares index.
-	# Index 0 = all water (blue), index 15 = all land (green), transitions = yellow.
 	var verts := PackedVector3Array()
 	var colors := PackedColorArray()
 	var normals := PackedVector3Array()
@@ -177,17 +181,17 @@ func _draw_tile_layers() -> void:
 		var mesh_index: int = layers[0]["mesh_index"]
 		var color: Color
 		if mesh_index == 0:
-			color = Color(0.15, 0.3, 0.7, 0.7)   # all water
+			color = Color(0.15, 0.3, 0.7, 0.7)
 		elif mesh_index == 15:
-			color = Color(0.3, 0.7, 0.2, 0.7)     # all land
+			color = Color(0.3, 0.7, 0.2, 0.7)
 		else:
-			color = Color(0.9, 0.7, 0.2, 0.7)     # transition
+			color = Color(0.9, 0.7, 0.2, 0.7)
 
 		var quad: PackedInt32Array = grid.subdivided_quads[qi]
-		var p0 := grid.subdivided_points[quad[0]] + lift
-		var p1 := grid.subdivided_points[quad[1]] + lift
-		var p2 := grid.subdivided_points[quad[2]] + lift
-		var p3 := grid.subdivided_points[quad[3]] + lift
+		var p0: Vector3 = grid.subdivided_points[quad[0]] + lift
+		var p1: Vector3 = grid.subdivided_points[quad[1]] + lift
+		var p2: Vector3 = grid.subdivided_points[quad[2]] + lift
+		var p3: Vector3 = grid.subdivided_points[quad[3]] + lift
 
 		verts.append(p0); verts.append(p1); verts.append(p2)
 		verts.append(p0); verts.append(p2); verts.append(p3)

@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://bghxdv54f261q"]
+
+[ext_resource type="PackedScene" uid="uid://deurw5ugh62dh" path="res://assets/meshes/Dual_Grid_L_L_L_L.fbx" id="1_mesh"]
+
+[node name="Dual_Grid_L_L_L_L" type="Node3D"]
+
+[node name="Mesh" parent="." instance=ExtResource("1_mesh")]

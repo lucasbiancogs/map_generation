@@ -1,10 +1,10 @@
 class_name TileHover
 extends Node3D
 
-@export var grid_path: NodePath
+@export var _grid: BaseGrid
+@export var _map_gen: MapGeneration
 @export var hover_color: Color = Color(0.3, 0.6, 1.0, 0.4)
 
-var _grid: OrganicGrid
 var _camera: Camera3D
 var _hover_mesh: MeshInstance3D
 var _hover_material: StandardMaterial3D
@@ -12,7 +12,6 @@ var _current_hover_idx: int = -1
 
 
 func _ready() -> void:
-	_grid = get_node(grid_path) as OrganicGrid
 	_camera = get_viewport().get_camera_3d()
 
 	_hover_material = StandardMaterial3D.new()
@@ -24,6 +23,13 @@ func _ready() -> void:
 	_hover_mesh = MeshInstance3D.new()
 	_hover_mesh.visible = false
 	add_child(_hover_mesh)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and _current_hover_idx >= 0:
+			_map_gen.toggle_point_height(_current_hover_idx)
 
 
 func _physics_process(_delta: float) -> void:

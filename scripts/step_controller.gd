@@ -1,8 +1,8 @@
 class_name StepController
 extends Control
 
-@export var grid_path: NodePath
-@export var visualizer_path: NodePath
+@export var grid: BaseGrid
+@export var visualizer: GridVisualizer
 
 var _current_step: int = 0
 var _step_label: Label
@@ -11,13 +11,7 @@ var _next_button: Button
 var _reset_button: Button
 var _run_all_button: Button
 
-var grid: OrganicGrid
-var visualizer: OrganicGridVisualizer
-
-
 func _ready() -> void:
-	grid = get_node(grid_path) as OrganicGrid
-	visualizer = get_node(visualizer_path) as OrganicGridVisualizer
 	_build_ui()
 	_current_step = OrganicGrid.TOTAL_STEPS
 	# Wait for MapGeneration to finish (it awaits one frame after grid).
