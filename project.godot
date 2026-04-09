@@ -19,3 +19,7 @@ config/features=PackedStringArray("4.4")
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/size/mode=3
+
+[rendering]
+
+environment/defaults/default_clear_color=Color(0.914464, 0.914464, 0.914464, 1)

@@ -1,8 +1,14 @@
-[gd_scene load_steps=2 format=3 uid="uid://c730m1a2almku"]
+[gd_scene load_steps=3 format=3 uid="uid://c730m1a2almku"]
 
-[ext_resource type="PackedScene" uid="uid://c6g24o7fs71el" path="res://assets/meshes/Water.fbx" id="1_mesh"]
+[ext_resource type="Material" uid="uid://c3mh5p2w5s8g7" path="res://assets/materials/water.tres" id="1_mat"]
 
-[node name="Water" type="Node3D"]
+[sub_resource type="QuadMesh" id="QuadMesh_j1q2v"]
+subdivide_width = 200
+subdivide_depth = 200
+orientation = 1
 
-[node name="Mesh" parent="." instance=ExtResource("1_mesh")]
-transform = Transform3D(3, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0)
+[node name="Water" type="MeshInstance3D"]
+transparency = 0.05
+cast_shadow = 0
+mesh = SubResource("QuadMesh_j1q2v")
+surface_material_override/0 = ExtResource("1_mat")

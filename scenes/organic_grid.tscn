@@ -51,4 +51,4 @@ _grid = NodePath("../OrganicGrid")
 _map_gen = NodePath("../MapGeneration")
 
 [node name="Water" parent="." instance=ExtResource("7_enksl")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+transform = Transform3D(50, 0, 0, 0, 1, 0, 0, 0, 50, 0, 0.8, 0)
