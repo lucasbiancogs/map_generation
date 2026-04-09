@@ -19,12 +19,12 @@ var quad_tile_layers: Array[Array] = []
 ## Tile definitions. name_map supports future variations (picks first for now).
 ## index values are binary: each digit = one corner (1=land, 0=water).
 const TILES: Array = [
-	{"name_map": ["Water"], "index_map": [{"index": 0000, "rotation": 0}]},
-	{"name_map": ["Dual_Grid_L_L_L_L"], "index_map": [{"index": 1111, "rotation": 0}]},
-	{"name_map": ["Dual_Grid_L_W_W_W"], "index_map": [{"index": 1000, "rotation": 0}, {"index": 0100, "rotation": 1}, {"index": 0010, "rotation": 2}, {"index": 0001, "rotation": 3}]},
-	{"name_map": ["Dual_Grid_L_L_L_W"], "index_map": [{"index": 1110, "rotation": 0}, {"index": 0111, "rotation": 1}, {"index": 1011, "rotation": 2}, {"index": 1101, "rotation": 3}]},
-	{"name_map": ["Dual_Grid_L_L_W_W"], "index_map": [{"index": 1100, "rotation": 0}, {"index": 0110, "rotation": 1}, {"index": 0011, "rotation": 2}, {"index": 1001, "rotation": 3}]},
-	{"name_map": ["Dual_Grid_L_W_L_W"], "index_map": [{"index": 1010, "rotation": 0}, {"index": 0101, "rotation": 1}]},
+	{"name_map": "Water", "index_map": [{"index": 0000, "rotation": 0}]},
+	{"name_map": "Dual_Grid_L_L_L_L", "index_map": [{"index": 1111, "rotation": 0}]},
+	{"name_map": "Dual_Grid_L_W_W_W", "index_map": [{"index": 1000, "rotation": 0}, {"index": 0100, "rotation": 1}, {"index": 0010, "rotation": 2}, {"index": 0001, "rotation": 3}]},
+	{"name_map": "Dual_Grid_L_L_L_W", "index_map": [{"index": 1110, "rotation": 0}, {"index": 0111, "rotation": 1}, {"index": 1011, "rotation": 2}, {"index": 1101, "rotation": 3}]},
+	{"name_map": "Dual_Grid_L_L_W_W", "index_map": [{"index": 1100, "rotation": 0}, {"index": 0110, "rotation": 1}, {"index": 0011, "rotation": 2}, {"index": 1001, "rotation": 3}]},
+	{"name_map": "Dual_Grid_L_W_L_W", "index_map": [{"index": 1010, "rotation": 0}, {"index": 0101, "rotation": 1}]},
 ]
 
 ## Loaded tile scenes: scene_name -> PackedScene.
@@ -49,7 +49,7 @@ func _ready() -> void:
 func _build_tile_lookup() -> void:
 	_tile_lookup.clear()
 	for tile_def in TILES:
-		var scene_name: String = tile_def["name_map"][0]
+		var scene_name: String = tile_def["name_map"]
 		for entry in tile_def["index_map"]:
 			var index: int = _binary_to_int(entry["index"])
 			_tile_lookup[index] = {
@@ -75,16 +75,16 @@ func _load_tile_scenes() -> void:
 	var scene_dir := "res://scenes/tiles/"
 	var loaded: Dictionary = {}
 	for tile_def in TILES:
-		for scene_name in tile_def["name_map"]:
-			if loaded.has(scene_name):
-				continue
-			var path: String = scene_dir + scene_name + ".tscn"
-			var scene: PackedScene = load(path)
-			if not scene:
-				push_warning("Failed to load tile scene: " + path)
-				continue
-			_tile_scenes[scene_name] = scene
-			loaded[scene_name] = true
+		var scene_name: String = tile_def["name_map"]
+		if loaded.has(scene_name):
+			continue
+		var path: String = scene_dir + scene_name + ".tscn"
+		var scene: PackedScene = load(path)
+		if not scene:
+			push_warning("Failed to load tile scene: " + path)
+			continue
+		_tile_scenes[scene_name] = scene
+		loaded[scene_name] = true
 
 
 func _init_height_map() -> void:

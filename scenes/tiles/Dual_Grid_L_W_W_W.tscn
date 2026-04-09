@@ -1,8 +1,29 @@
-[gd_scene load_steps=2 format=3 uid="uid://c70nt4dus2aeb"]
+[gd_scene load_steps=7 format=3 uid="uid://c70nt4dus2aeb"]
 
 [ext_resource type="PackedScene" uid="uid://6ct2mo458nse" path="res://assets/meshes/Dual_Grid_L_W_W_W.fbx" id="1_mesh"]
+[ext_resource type="Script" uid="uid://3a5esktinmhf" path="res://scripts/mesh_variation.gd" id="1_synvh"]
+[ext_resource type="PackedScene" uid="uid://c71p2wef2cjmy" path="res://assets/meshes/Dual_Grid_L_W_W_W_01.fbx" id="3_vp83f"]
+[ext_resource type="PackedScene" uid="uid://bxl4u603jmmvu" path="res://assets/meshes/Dual_Grid_L_W_W_W_02.fbx" id="4_c3sjb"]
+[ext_resource type="PackedScene" uid="uid://25vhiidug0v8" path="res://assets/meshes/Dual_Grid_L_W_W_W_03.fbx" id="5_s7wcd"]
+[ext_resource type="PackedScene" uid="uid://du571ftun6u5i" path="res://assets/meshes/Dual_Grid_L_W_W_W_04.fbx" id="6_wsawk"]
 
 [node name="Dual_Grid_L_W_W_W" type="Node3D"]
 
-[node name="Mesh" parent="." instance=ExtResource("1_mesh")]
+[node name="MeshVariation" type="Node3D" parent="."]
+script = ExtResource("1_synvh")
+metadata/_custom_type_script = "uid://3a5esktinmhf"
+
+[node name="Mesh_0" parent="MeshVariation" instance=ExtResource("1_mesh")]
+transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 0, 0, 0)
+
+[node name="Mesh_1" parent="MeshVariation" instance=ExtResource("3_vp83f")]
+transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 0, 0, 0)
+
+[node name="Mesh_2" parent="MeshVariation" instance=ExtResource("4_c3sjb")]
+transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 0, 0, 0)
+
+[node name="Mesh_3" parent="MeshVariation" instance=ExtResource("5_s7wcd")]
+transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 0, 0, 0)
+
+[node name="Mesh_4" parent="MeshVariation" instance=ExtResource("6_wsawk")]
 transform = Transform3D(-4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 0, 0, 0)
