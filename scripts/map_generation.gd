@@ -33,6 +33,8 @@ var _tile_scenes: Dictionary = {}
 var _tile_lookup: Dictionary = {}
 ## Container node for placed tile instances.
 var _tiles_container: Node3D
+## Per-quad canonical vertex order [TL, TR, BR, BL] based on spatial position.
+var _quad_canonical_corners: Array[PackedInt32Array] = []
 ## Per-quad rotation offset to correct for non-uniform quad orientations.
 var _quad_rotation_offsets: PackedInt32Array = PackedInt32Array()
 
@@ -90,13 +92,17 @@ func _init_height_map() -> void:
 		return
 	height_map.resize(grid.subdivided_points.size())
 	height_map.fill(0)
-	_compute_quad_rotation_offsets()
+	_compute_quad_canonical_order()
 
 
-## Computes per-quad rotation offsets by comparing each quad's orientation to the
-## regular grid reference (where quad[0] is at the top-left, angle -135° from center).
-func _compute_quad_rotation_offsets() -> void:
+## Computes per-quad canonical vertex ordering and rotation offsets.
+## Sorts each quad's vertices into spatial [TL, TR, BR, BL] order by angle from center,
+## starting from the vertex closest to the -135° reference (top-left direction).
+## This ensures the marching-squares index bits correspond to consistent corner positions
+## regardless of how the quad was originally constructed.
+func _compute_quad_canonical_order() -> void:
 	var ref_angle := -PI * 3.0 / 4.0  # -135°: direction from center to TL
+	_quad_canonical_corners.clear()
 	_quad_rotation_offsets.resize(grid.subdivided_quads.size())
 
 	for qi in range(grid.subdivided_quads.size()):
@@ -104,13 +110,45 @@ func _compute_quad_rotation_offsets() -> void:
 		var center := (grid.subdivided_points[quad[0]] + grid.subdivided_points[quad[1]]
 			+ grid.subdivided_points[quad[2]] + grid.subdivided_points[quad[3]]) * 0.25
 
-		var dir := grid.subdivided_points[quad[0]] - center
-		var angle := atan2(dir.z, dir.x)
-		var diff := fmod(angle - ref_angle, TAU)
-		if diff < 0:
-			diff += TAU
+		# Compute angle from center for each vertex.
+		var angles: Array[float] = []
+		for i in range(4):
+			var dir := grid.subdivided_points[quad[i]] - center
+			angles.append(atan2(dir.z, dir.x))
 
+		# Sort vertex indices by angle ascending (CCW order).
+		var sorted_indices: Array[int] = [0, 1, 2, 3]
+		sorted_indices.sort_custom(func(a: int, b: int) -> bool:
+			return angles[a] < angles[b]
+		)
+
+		# Find which sorted position is closest to the reference angle.
+		var best_start: int = 0
+		var best_diff: float = INF
+		for i in range(4):
+			var d: float = absf(_wrap_angle(angles[sorted_indices[i]] - ref_angle))
+			if d < best_diff:
+				best_diff = d
+				best_start = i
+
+		# Build canonical order starting from TL, going CCW: TL, TR, BR, BL.
+		var canonical := PackedInt32Array()
+		canonical.resize(4)
+		for i in range(4):
+			canonical[i] = quad[sorted_indices[(best_start + i) % 4]]
+		_quad_canonical_corners.append(canonical)
+
+		# Rotation offset: how many 90° steps the TL vertex is from the reference.
+		var tl_angle: float = angles[sorted_indices[best_start]]
+		var diff := fmod(tl_angle - ref_angle, TAU)
+		if diff < 0.0:
+			diff += TAU
 		_quad_rotation_offsets[qi] = roundi(diff / (PI * 0.5)) % 4
+
+
+## Wraps an angle difference to the range [-PI, PI].
+func _wrap_angle(angle: float) -> float:
+	return fmod(angle + PI, TAU) - PI
 
 
 ## Sets a point's height and refreshes affected tiles.
@@ -142,11 +180,11 @@ func compute_tile_layers() -> void:
 		return
 
 	for qi in range(grid.subdivided_quads.size()):
-		var quad: PackedInt32Array = grid.subdivided_quads[qi]
-		var h0: int = height_map[quad[0]]
-		var h1: int = height_map[quad[1]]
-		var h2: int = height_map[quad[2]]
-		var h3: int = height_map[quad[3]]
+		var corners: PackedInt32Array = _quad_canonical_corners[qi]
+		var h0: int = height_map[corners[0]]
+		var h1: int = height_map[corners[1]]
+		var h2: int = height_map[corners[2]]
+		var h3: int = height_map[corners[3]]
 
 		var max_h: int = maxi(maxi(h0, h1), maxi(h2, h3))
 
