@@ -22,8 +22,6 @@ uniform float beers_law = 2.0; // Beer's law application
 uniform float depth_offset = -0.75; // Offset
 
 uniform float edge_scale = 0.1;
-uniform float near = 1.0;
-uniform float far = 100.0;
 uniform vec3 edge_color : source_color;
 
 // Varying variables
@@ -34,10 +32,6 @@ float fresnel(float amount, vec3 normal, vec3 view)
 {
 	return pow((1.0 - clamp(dot(normalize(normal), normalize(view)), 0.0, 1.0 )), amount);
 }
-float edge(float depth){
-	depth = 2.0 * depth - 1.0;
-	return near * far / (far + depth * (near - far));
-}
 
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -46,22 +40,29 @@ void vertex() {
 }
 
 void fragment() {
-	// Depth variables and calc
-	float depth_texture = texture(DEPTH_TEXTURE, SCREEN_UV).r * 2.0 - 1.0;
-	float depth = PROJECTION_MATRIX[3][2] / (depth_texture + PROJECTION_MATRIX[2][2]);
-	float depth_blend = exp((depth+VERTEX.z + depth_offset) * -beers_law);
-	depth_blend = clamp(1.0 - depth_blend, 0.0, 1.0);	
+	// Reconstruct background linear depth via inverse projection
+	float depth_raw = texture(DEPTH_TEXTURE, SCREEN_UV).r;
+	vec3 ndc = vec3(SCREEN_UV * 2.0 - 1.0, depth_raw);
+	vec4 view_pos = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
+	view_pos.xyz /= view_pos.w;
+	float bg_depth = -view_pos.z;
+
+	// Water surface depth (VERTEX is in view space in fragment)
+	float water_depth = -VERTEX.z;
+
+	// Depth difference for color blending and edge detection
+	float depth_diff = bg_depth - water_depth;
+	float depth_blend = exp((depth_diff + depth_offset) * -beers_law);
+	depth_blend = clamp(1.0 - depth_blend, 0.0, 1.0);
 	float depth_blend_power = clamp(pow(depth_blend, 2.5), 0.0, 1.0);
 
 	// Retrieving depth color and applying the deep and shallow colors
 	vec3 screen_color = textureLod(SCREEN_TEXTURE, SCREEN_UV, depth_blend_power * 2.5).rgb;
 	vec3 depth_color = mix(color_shallow.rgb, color_deep.rgb, depth_blend_power);
 	vec3 color = mix(screen_color * depth_color, depth_color * 0.25, depth_blend_power * 0.5);
-	
-	// Getting edge depth calc
-	float z_depth = edge(texture(DEPTH_TEXTURE, SCREEN_UV).x);
-	float z_pos = edge(FRAGCOORD.z);
-	float z_dif = z_depth - z_pos;
+
+	// Edge detection
+	float z_dif = depth_diff;
 	
 	// Time calculations for wave (normal map) movement
 	vec2 time = (TIME * wave_direction) * time_scale; // Movement rate of first wave
