@@ -211,7 +211,7 @@ func compute_tile_layers() -> void:
 		quad_tile_layers.append(layers)
 
 
-## Places tile scenes at quad centers.
+## Places tile scenes at quad centers, deforming meshes to fit each quad's shape.
 func place_tiles() -> void:
 	if _tiles_container:
 		_tiles_container.free()
@@ -250,11 +250,129 @@ func place_tiles() -> void:
 			if not _tile_scenes.has(scene_name):
 				continue
 
-			var quad_offset: int = _quad_rotation_offsets[qi] if qi < _quad_rotation_offsets.size() else 0
-			var final_rotation: int = (rotation_steps - quad_offset + 4) % 4
-
 			var tile: Node3D = _tile_scenes[scene_name].instantiate()
 			tile.position = center + Vector3.UP * layer * layer_height
-			if final_rotation > 0:
-				tile.rotation.y = deg_to_rad(final_rotation * 90.0)
 			_tiles_container.add_child(tile)
+			_deform_tile_to_quad(tile, qi, rotation_steps)
+
+
+# ===========================================================================
+# Lattice deformation — warp tile meshes to fit irregular quad shapes
+# ===========================================================================
+
+## Deforms all meshes within a tile to match the quad's actual corner positions.
+## Uses bilinear interpolation in XZ to map the mesh's AABB corners to the quad
+## corners, with rotation_steps shifting which AABB corner maps to which quad corner.
+func _deform_tile_to_quad(tile: Node3D, qi: int, rotation_steps: int) -> void:
+	var canonical: PackedInt32Array = _quad_canonical_corners[qi]
+	var quad: PackedInt32Array = grid.subdivided_quads[qi]
+	var center := (grid.subdivided_points[quad[0]] + grid.subdivided_points[quad[1]]
+		+ grid.subdivided_points[quad[2]] + grid.subdivided_points[quad[3]]) * 0.25
+
+	# Build target XZ corners in tile local space (tile is at center, no rotation).
+	# AABB corner order: [TL(min_x,min_z), TR(max_x,min_z), BR(max_x,max_z), BL(min_x,max_z)]
+	# rotation_steps shifts which canonical corner each AABB corner maps to.
+	var target_xz: Array[Vector3] = []
+	for i in range(4):
+		var canon_idx: int = (i - rotation_steps + 4) % 4
+		target_xz.append(grid.subdivided_points[canonical[canon_idx]] - center)
+
+	# Collect all MeshInstance3D nodes in the tile.
+	var mesh_instances: Array[MeshInstance3D] = []
+	_find_mesh_instances(tile, mesh_instances)
+	if mesh_instances.is_empty():
+		return
+
+	# Compute a combined AABB in the tile root's local space.
+	var ref_aabb := _compute_combined_aabb(tile, mesh_instances)
+
+	# Deform each mesh.
+	for mi in mesh_instances:
+		_deform_mesh_instance(mi, tile, ref_aabb, target_xz)
+
+
+## Recursively finds all MeshInstance3D nodes under the given node.
+func _find_mesh_instances(node: Node, result: Array[MeshInstance3D]) -> void:
+	if node is MeshInstance3D:
+		result.append(node)
+	for child in node.get_children():
+		_find_mesh_instances(child, result)
+
+
+## Computes the combined AABB of all mesh instances in the tile root's local space.
+func _compute_combined_aabb(tile_root: Node3D, instances: Array[MeshInstance3D]) -> AABB:
+	var combined := AABB()
+	var first := true
+
+	for mi in instances:
+		var mesh: Mesh = mi.mesh
+		if not mesh:
+			continue
+		var mi_to_tile: Transform3D = tile_root.global_transform.affine_inverse() * mi.global_transform
+		var mesh_aabb: AABB = mesh.get_aabb()
+		for corner_idx in range(8):
+			var corner: Vector3 = mesh_aabb.get_endpoint(corner_idx)
+			var tile_pos: Vector3 = mi_to_tile * corner
+			if first:
+				combined = AABB(tile_pos, Vector3.ZERO)
+				first = false
+			else:
+				combined = combined.expand(tile_pos)
+
+	return combined
+
+
+## Deforms a single MeshInstance3D using bilinear interpolation in XZ.
+func _deform_mesh_instance(mi: MeshInstance3D, tile_root: Node3D,
+		ref_aabb: AABB, target_xz: Array[Vector3]) -> void:
+	var src_mesh: Mesh = mi.mesh
+	if not src_mesh:
+		return
+
+	var mi_to_tile: Transform3D = tile_root.global_transform.affine_inverse() * mi.global_transform
+	var tile_to_mi: Transform3D = mi_to_tile.affine_inverse()
+
+	var new_mesh := ArrayMesh.new()
+
+	for surf_idx in range(src_mesh.get_surface_count()):
+		var arrays: Array = src_mesh.surface_get_arrays(surf_idx)
+		if arrays.is_empty():
+			continue
+
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		if vertices.is_empty():
+			continue
+
+		var new_vertices := PackedVector3Array()
+		new_vertices.resize(vertices.size())
+
+		for vi in range(vertices.size()):
+			var tile_pos: Vector3 = mi_to_tile * vertices[vi]
+
+			# Normalize XZ within the reference AABB.
+			var u: float = 0.5
+			var w: float = 0.5
+			if ref_aabb.size.x > 0.001:
+				u = clampf((tile_pos.x - ref_aabb.position.x) / ref_aabb.size.x, 0.0, 1.0)
+			if ref_aabb.size.z > 0.001:
+				w = clampf((tile_pos.z - ref_aabb.position.z) / ref_aabb.size.z, 0.0, 1.0)
+
+			# Bilinear interpolation: target_xz = [TL, TR, BR, BL]
+			var new_xz: Vector3 = (
+				target_xz[0] * (1.0 - u) * (1.0 - w) +
+				target_xz[1] * u * (1.0 - w) +
+				target_xz[3] * (1.0 - u) * w +
+				target_xz[2] * u * w
+			)
+
+			var deformed: Vector3 = Vector3(new_xz.x, tile_pos.y, new_xz.z)
+			new_vertices[vi] = tile_to_mi * deformed
+
+		arrays[Mesh.ARRAY_VERTEX] = new_vertices
+		new_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+
+		var mat: Material = src_mesh.surface_get_material(surf_idx)
+		if mat:
+			new_mesh.surface_set_material(new_mesh.get_surface_count() - 1, mat)
+
+	mi.mesh = new_mesh
