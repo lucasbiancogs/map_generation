@@ -2,7 +2,7 @@ class_name OrganicGrid
 extends BaseGrid
 
 ## Distance from center to hex vertex.
-@export_range(0.5, 20.0) var hex_size: float = 1.0
+@export_range(0.5, 20.0) var hex_size: float = 2.0
 ## Number of concentric rings per patch.
 @export_range(1, 10) var iterations_count: int = 6
 ## Seed for random triangle merging.
